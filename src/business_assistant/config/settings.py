@@ -1,0 +1,96 @@
+"""Application settings loaded from environment variables."""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+
+from dotenv import load_dotenv
+
+from .constants import (
+    DEFAULT_CHAT_LOG_FILE,
+    DEFAULT_MAX_CONVERSATION_HISTORY,
+    DEFAULT_MEMORY_FILE,
+    DEFAULT_OPENAI_MODEL,
+    ENV_CHAT_LOG_FILE,
+    ENV_MAX_CONVERSATION_HISTORY,
+    ENV_MEMORY_FILE,
+    ENV_OPENAI_API_KEY,
+    ENV_OPENAI_MODEL,
+    ENV_PLUGINS,
+    ENV_XMPP_ALLOWED_JIDS,
+    ENV_XMPP_DEFAULT_RECEIVER,
+    ENV_XMPP_JID,
+    ENV_XMPP_PASSWORD,
+)
+
+
+@dataclass(frozen=True)
+class XmppSettings:
+    """XMPP connection settings."""
+
+    jid: str
+    password: str
+    default_receiver: str
+    allowed_jids: list[str]
+
+
+@dataclass(frozen=True)
+class OpenAISettings:
+    """OpenAI API settings."""
+
+    api_key: str
+    model: str
+
+
+@dataclass(frozen=True)
+class AppSettings:
+    """Top-level application settings."""
+
+    xmpp: XmppSettings
+    openai: OpenAISettings
+    memory_file: str
+    chat_log_file: str
+    plugin_names: list[str]
+    max_conversation_history: int = DEFAULT_MAX_CONVERSATION_HISTORY
+
+
+def load_settings() -> AppSettings:
+    """Load settings from environment variables.
+
+    Calls dotenv.load_dotenv() to pick up .env files.
+    """
+    load_dotenv()
+
+    xmpp = XmppSettings(
+        jid=os.environ.get(ENV_XMPP_JID, ""),
+        password=os.environ.get(ENV_XMPP_PASSWORD, ""),
+        default_receiver=os.environ.get(ENV_XMPP_DEFAULT_RECEIVER, ""),
+        allowed_jids=[
+            jid.strip()
+            for jid in os.environ.get(ENV_XMPP_ALLOWED_JIDS, "").split(",")
+            if jid.strip()
+        ],
+    )
+
+    openai = OpenAISettings(
+        api_key=os.environ.get(ENV_OPENAI_API_KEY, ""),
+        model=os.environ.get(ENV_OPENAI_MODEL, DEFAULT_OPENAI_MODEL),
+    )
+
+    raw_plugins = os.environ.get(ENV_PLUGINS, "")
+    plugin_names = [name.strip() for name in raw_plugins.split(",") if name.strip()]
+
+    return AppSettings(
+        xmpp=xmpp,
+        openai=openai,
+        memory_file=os.environ.get(ENV_MEMORY_FILE, DEFAULT_MEMORY_FILE),
+        chat_log_file=os.environ.get(ENV_CHAT_LOG_FILE, DEFAULT_CHAT_LOG_FILE),
+        plugin_names=plugin_names,
+        max_conversation_history=int(
+            os.environ.get(
+                ENV_MAX_CONVERSATION_HISTORY,
+                str(DEFAULT_MAX_CONVERSATION_HISTORY),
+            )
+        ),
+    )
