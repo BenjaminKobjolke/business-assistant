@@ -26,6 +26,21 @@ Plugin-based XMPP chatbot using PydanticAI + bot-commander. Source code in `src/
 - `BotConfigProvider` (bot-commander): `get_bot_setting(key, fallback) -> str`
 - Plugin entry point: `register(registry: PluginRegistry) -> None`
 
+## Restarting the Bot
+
+The bot supports file-based restart. After making code changes to plugins or the bot itself, trigger a restart by creating a sentinel file:
+
+```bash
+touch restart.flag
+```
+
+The bot polls for `restart.flag` every 5 seconds. When detected, it:
+1. Deletes the file
+2. Shuts down the current application (XMPP disconnect, plugin cleanup)
+3. Starts a fresh application with reloaded plugins, settings, and agent
+
+SIGINT (Ctrl+C) or SIGTERM cause a clean exit without restart.
+
 ## Rules
 
 ### Common Rules

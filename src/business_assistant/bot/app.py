@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 
 from bot_commander.manager import BotManager
@@ -55,7 +57,16 @@ class Application:
         self._bot_manager.start()
 
     def shutdown(self) -> None:
-        """Shut down the bot."""
+        """Shut down the bot and reset the XMPP singleton for restart."""
         if self._bot_manager:
             self._bot_manager.shutdown()
+        _reset_xmpp_singleton()
         logger.info(LOG_APP_STOPPED)
+
+
+def _reset_xmpp_singleton() -> None:
+    """Reset the XmppBot singleton so a fresh start() can re-initialize."""
+    with contextlib.suppress(Exception):
+        from xmpp_bot.bot import XmppBot
+
+        asyncio.run(XmppBot.reset_instance())

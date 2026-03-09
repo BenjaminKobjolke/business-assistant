@@ -31,11 +31,15 @@ BOT_TYPE_XMPP = "xmpp"
 ERR_AGENT_FAILED = "Sorry, I encountered an error processing your message. Please try again."
 ERR_PLUGIN_LOAD_FAILED = "Failed to load plugin: {name}"
 
+# Restart
+RESTART_FLAG_FILE = "restart.flag"
+
 # Log messages
 LOG_PLUGIN_LOADED = "Loaded plugin: {name}"
 LOG_PLUGIN_FAILED = "Failed to load plugin: {name}"
 LOG_APP_STARTING = "Starting Business Assistant v2"
 LOG_APP_STOPPED = "Business Assistant v2 stopped"
+LOG_APP_RESTARTING = "Restart requested via restart.flag — restarting..."
 LOG_AGENT_ERROR = "Error running AI agent"
 
 # System prompt
