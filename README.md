@@ -38,6 +38,34 @@ Plugins are separate packages discovered via the `PLUGINS` environment variable 
 ### Available Plugins
 
 - **business-assistant-imap-plugin** (`business_assistant_imap`): IMAP/SMTP email operations
+- **business-assistant-calendar-plugin** (`business_assistant_calendar`): Google Calendar operations
+
+### Plugin Configuration
+
+Only plugins listed in the `PLUGINS` environment variable are loaded. Set it in `.env` as a comma-separated list of Python module names:
+
+```bash
+# Both plugins
+PLUGINS=business_assistant_imap,business_assistant_calendar
+
+# IMAP only
+PLUGINS=business_assistant_imap
+
+# Calendar only
+PLUGINS=business_assistant_calendar
+
+# No plugins
+PLUGINS=
+```
+
+Each plugin also requires its own environment variables to function. If the required variable is missing, the plugin skips registration gracefully.
+
+| Plugin | Required env var | Additional env vars |
+|--------|-----------------|-------------------|
+| `business_assistant_imap` | `IMAP_SERVER` | `IMAP_USERNAME`, `IMAP_PASSWORD`, `SMTP_SERVER`, etc. |
+| `business_assistant_calendar` | `GOOGLE_CALENDAR_CREDENTIALS_PATH` | `GOOGLE_CALENDAR_TOKEN_PATH`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_TIMEZONE`, `GOOGLE_CALENDAR_FREE_CHECK_IDS` |
+
+See `.env.example` for all available settings.
 
 ## Memory System
 

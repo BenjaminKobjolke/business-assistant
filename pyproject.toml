@@ -9,6 +9,7 @@ dependencies = [
     "python-dotenv",
     "bot-commander[xmpp]",
     "business-assistant-imap-plugin",
+    "business-assistant-calendar-plugin",
 ]
 
 [build-system]
@@ -21,6 +22,7 @@ packages = ["src/business_assistant"]
 [tool.uv.sources]
 bot-commander = { path = "D:/GIT/BenjaminKobjolke/bot-commander", editable = true }
 business-assistant-imap-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-imap-plugin", editable = true }
+business-assistant-calendar-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-calendar-plugin", editable = true }
 
 [project.scripts]
 business-assistant = "business_assistant.main:main"
