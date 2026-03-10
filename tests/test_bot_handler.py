@@ -15,6 +15,7 @@ from pydantic_ai.messages import (
     ToolReturnPart,
     UserPromptPart,
 )
+from pydantic_ai.usage import RunUsage
 
 from business_assistant.bot.handler import AIMessageHandler, _safe_truncate
 from business_assistant.config.constants import (
@@ -41,6 +42,7 @@ def _make_handler(
         mock_result = MagicMock()
         mock_result.output = agent_result
         mock_result.all_messages.return_value = [{"role": "user"}, {"role": "assistant"}]
+        mock_result.usage.return_value = RunUsage()
         mock_agent.run_sync.return_value = mock_result
 
     memory = MemoryStore(tmp_memory_file or "nonexistent.json")
@@ -54,6 +56,7 @@ def _make_handler(
         openai=OpenAISettings(api_key="sk-test", model="gpt-4o"),
         memory_file="data/memory.json",
         chat_log_file=chat_log_file,
+        usage_log_file="data/usage.log",
         plugin_names=[],
     )
 

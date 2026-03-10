@@ -11,6 +11,7 @@ from pathlib import Path
 from bot_commander.types import BotMessage, BotResponse
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelRequest, RetryPromptPart, ToolReturnPart
+from pydantic_ai.usage import RunUsage
 
 from business_assistant.agent.deps import Deps
 from business_assistant.config.constants import (
@@ -24,6 +25,7 @@ from business_assistant.config.constants import (
 )
 from business_assistant.config.settings import AppSettings
 from business_assistant.memory.store import MemoryStore
+from business_assistant.usage.tracker import UsageTracker
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +44,15 @@ class AIMessageHandler:
         memory: MemoryStore,
         settings: AppSettings,
         plugin_data: dict | None = None,
+        usage_tracker: UsageTracker | None = None,
+        model_name: str = "",
     ) -> None:
         self._agent = agent
         self._memory = memory
         self._settings = settings
         self._plugin_data = plugin_data or {}
+        self._usage_tracker = usage_tracker
+        self._model_name = model_name
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._chat_log_path = Path(settings.chat_log_file)
         self._chat_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -75,21 +81,27 @@ class AIMessageHandler:
                 deps,
                 history,
             )
-            output, new_history = future.result(timeout=120)
+            output, new_history, usage = future.result(timeout=120)
             self._histories[message.user_id] = _safe_truncate(
                 new_history, self._settings.max_conversation_history
             )
             self._log_chat(message.user_id, message.text, output, error=False)
+            if self._usage_tracker:
+                self._usage_tracker.log(
+                    usage, new_history, message.user_id, self._model_name
+                )
             return BotResponse(text=output)
         except Exception:
             logger.error(LOG_AGENT_ERROR, exc_info=True)
             self._log_chat(message.user_id, message.text, ERR_AGENT_FAILED, error=True)
             return BotResponse(text=ERR_AGENT_FAILED)
 
-    def _run_agent(self, text: str, deps: Deps, message_history: list) -> tuple[str, list]:
+    def _run_agent(
+        self, text: str, deps: Deps, message_history: list
+    ) -> tuple[str, list, RunUsage]:
         """Run the PydanticAI agent synchronously (called from thread pool)."""
         result = self._agent.run_sync(text, deps=deps, message_history=message_history)
-        return result.output, result.all_messages()
+        return result.output, result.all_messages(), result.usage()
 
     def _handle_command(self, text: str, user_id: str) -> BotResponse | None:
         """Check for special chat commands. Returns a BotResponse or None."""

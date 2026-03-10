@@ -65,6 +65,7 @@ class TestWriteFeedback:
             openai=OpenAISettings(api_key="sk-test", model="gpt-4o"),
             memory_file="data/memory.json",
             chat_log_file="data/chat.log",
+            usage_log_file="data/usage.log",
             plugin_names=[],
         )
         deps = Deps(

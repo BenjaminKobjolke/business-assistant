@@ -13,6 +13,7 @@ from bot_commander.manager import BotManager
 from business_assistant.agent.agent import create_agent
 from business_assistant.config.constants import (
     BOT_TYPE_XMPP,
+    CORE_PLUGIN_NAME,
     CREDENTIAL_DIR,
     ENV_RTM_TOKEN,
     LOG_APP_STARTING,
@@ -24,6 +25,7 @@ from business_assistant.config.settings import load_settings
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.loader import load_plugins
 from business_assistant.plugins.registry import PluginRegistry
+from business_assistant.usage.tracker import UsageTracker
 
 from .config_provider import SettingsConfigProvider
 from .handler import AIMessageHandler
@@ -84,11 +86,18 @@ class Application:
         model_name = f"openai:{settings.openai.model}"
         agent = create_agent(registry, memory, model_name)
 
+        tool_plugin_map = registry.tool_plugin_map()
+        for name in ("memory_get", "memory_set", "memory_delete", "memory_list", "write_feedback"):
+            tool_plugin_map[name] = CORE_PLUGIN_NAME
+        usage_tracker = UsageTracker(settings.usage_log_file, tool_plugin_map)
+
         handler = AIMessageHandler(
             agent=agent,
             memory=memory,
             settings=settings,
             plugin_data=plugin_data,
+            usage_tracker=usage_tracker,
+            model_name=settings.openai.model,
         )
 
         config_provider = SettingsConfigProvider(settings.xmpp)
