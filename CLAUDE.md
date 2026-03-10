@@ -61,8 +61,13 @@ After implementing features or making significant changes, run tests in this ord
    - These test AI decision-making with real OpenAI API + mocked services
    - If an integration test fails, the system prompt likely needs adjustment
 
-4. **Code analysis**:
+4. **Code analysis** (runs on v2 + all plugins):
    - `powershell -Command "cd 'D:\GIT\BenjaminKobjolke\business-assistant-v2'; cmd /c '.\tools\analyze_code.bat'"`
+   - After the analysis completes, check each project's `code_analysis_results/` folder:
+     - `D:\GIT\BenjaminKobjolke\business-assistant-v2\code_analysis_results\`
+     - `D:\GIT\BenjaminKobjolke\business-assistant-imap-plugin\code_analysis_results\`
+     - `D:\GIT\BenjaminKobjolke\business-assistant-calendar-plugin\code_analysis_results\`
+     - `D:\GIT\BenjaminKobjolke\business-assistant-rtm-plugin\code_analysis_results\`
 
 Fix any reported issues before committing.
 
