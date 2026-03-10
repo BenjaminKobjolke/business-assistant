@@ -16,15 +16,16 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from bot_commander.types import BotMessage
 from business_assistant_imap.plugin import register
 from dotenv import load_dotenv
 
 from business_assistant.agent.agent import create_agent
-from business_assistant.bot.handler import AIMessageHandler
+from business_assistant.agent.deps import Deps
 from business_assistant.config.settings import AppSettings, OpenAISettings, XmppSettings
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.registry import PluginRegistry
+
+from .conftest import FakeEmailMessage
 
 # ---------------------------------------------------------------------------
 # Load .env so OPENAI_API_KEY / OPENAI_MODEL are available
@@ -40,50 +41,6 @@ FAKE_FTP_URL = "https://cdn.example.com/abc12345_screenshot.png"
 
 
 # ---------------------------------------------------------------------------
-# Fake email helpers
-# ---------------------------------------------------------------------------
-class _FakeRawMessage:
-    def __init__(self, headers: dict[str, str] | None = None) -> None:
-        self._headers = headers or {}
-
-    def get(self, key: str, default: str = "") -> str:
-        return self._headers.get(key, default)
-
-
-class _FakeEmailMessage:
-    """Minimal stand-in for imap-client-lib EmailMessage."""
-
-    def __init__(
-        self,
-        message_id: str = "123",
-        from_address: str = "sender@example.com",
-        to_address: str = "",
-        subject: str = "Test Subject",
-        date: str = "Mon, 09 Mar 2026 10:00:00 +0100",
-        body_plain: str = "Hello, this is a test email.",
-        body_html: str = "",
-        attachments: list | None = None,
-    ):
-        self.message_id = message_id
-        self.from_address = from_address
-        self.subject = subject
-        self.date = date
-        self._body_plain = body_plain
-        self._body_html = body_html
-        self.attachments = attachments or []
-        self.raw_message = _FakeRawMessage(
-            {"To": to_address, "From": from_address}
-        )
-
-    def get_body(self, content_type: str = "text/plain") -> str | None:
-        if content_type == "text/plain":
-            return self._body_plain
-        if content_type == "text/html":
-            return self._body_html
-        return None
-
-
-# ---------------------------------------------------------------------------
 # Test data — email with an image attachment
 # ---------------------------------------------------------------------------
 _FAKE_ATTACHMENT = SimpleNamespace(
@@ -94,7 +51,7 @@ _FAKE_ATTACHMENT = SimpleNamespace(
     is_inline=False,
 )
 
-INBOX_EMAIL = _FakeEmailMessage(
+INBOX_EMAIL = FakeEmailMessage(
     message_id="300",
     from_address="alice@example.com",
     subject="Here is the screenshot",
@@ -152,7 +109,6 @@ class TestAttachmentUrlFlow:
     def test_show_image_calls_get_attachment_url(self, tmp_path: Path) -> None:
         # -- Build real stack --------------------------------------------------
         memory_file = str(tmp_path / "memory.json")
-        chat_log = str(tmp_path / "chat.log")
         memory = MemoryStore(memory_file)
 
         settings = AppSettings(
@@ -167,7 +123,7 @@ class TestAttachmentUrlFlow:
                 model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
             ),
             memory_file=memory_file,
-            chat_log_file=chat_log,
+            chat_log_file=str(tmp_path / "chat.log"),
             plugin_names=["business_assistant_imap"],
             max_conversation_history=100,
         )
@@ -195,21 +151,19 @@ class TestAttachmentUrlFlow:
             model_name = f"openai:{settings.openai.model}"
             agent = create_agent(registry, memory, model_name)
 
-            handler = AIMessageHandler(
-                agent=agent,
+            deps = Deps(
                 memory=memory,
                 settings=settings,
+                user_id="user@example.com",
                 plugin_data=plugin_data,
             )
 
-            # -- Ask the AI to show the image ----------------------------------
-            response = handler.handle(
-                BotMessage(
-                    user_id="user@example.com",
-                    text="Show me the image from the latest email",
-                )
+            # -- Ask the AI to show the image (direct run_sync) ----------------
+            result = agent.run_sync(
+                "Show me the image from the latest email",
+                deps=deps,
             )
-            response_text = response.text
+            response_text = result.output
 
             # -- Assertion 1: get_attachment_url was called (FTP upload) --------
             assert mock_ftp.upload.call_count >= 1, (
