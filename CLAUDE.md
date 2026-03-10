@@ -41,6 +41,16 @@ The bot polls for `restart.flag` every 5 seconds. When detected, it:
 
 SIGINT (Ctrl+C) or SIGTERM cause a clean exit without restart.
 
+## Code Analysis
+
+After implementing new features or making significant changes, run the code analysis:
+
+```bash
+powershell -Command "cd 'D:\GIT\BenjaminKobjolke\business-assistant-v2'; cmd /c '.\tools\analyze_code.bat'"
+```
+
+Fix any reported issues before committing.
+
 ## Rules
 
 ### Common Rules

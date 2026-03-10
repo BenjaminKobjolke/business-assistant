@@ -209,3 +209,7 @@ __marimo__/
 .pytest_cache
 .ruff_cache
 data
+
+# Code analysis
+tools/analyze_code_config.bat
+code_analysis_results/
