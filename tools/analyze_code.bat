@@ -21,6 +21,7 @@ for %%P in (
     business-assistant-imap-plugin
     business-assistant-calendar-plugin
     business-assistant-rtm-plugin
+    business-assistant-transcribe-plugin
 ) do (
     if exist "%PLUGIN_BASE%\%%P\code_analysis_rules.json" (
         echo.

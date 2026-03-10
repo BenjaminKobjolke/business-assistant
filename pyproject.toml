@@ -11,6 +11,7 @@ dependencies = [
     "business-assistant-imap-plugin",
     "business-assistant-calendar-plugin",
     "business-assistant-rtm-plugin",
+    "business-assistant-transcribe-plugin",
 ]
 
 [build-system]
@@ -25,6 +26,7 @@ bot-commander = { path = "D:/GIT/BenjaminKobjolke/bot-commander", editable = tru
 business-assistant-imap-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-imap-plugin", editable = true }
 business-assistant-calendar-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-calendar-plugin", editable = true }
 business-assistant-rtm-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-rtm-plugin", editable = true }
+business-assistant-transcribe-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-transcribe-plugin", editable = true }
 
 [project.scripts]
 business-assistant = "business_assistant.main:main"
