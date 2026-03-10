@@ -9,7 +9,12 @@ import logging
 from bot_commander.manager import BotManager
 
 from business_assistant.agent.agent import create_agent
-from business_assistant.config.constants import BOT_TYPE_XMPP, LOG_APP_STARTING, LOG_APP_STOPPED
+from business_assistant.config.constants import (
+    BOT_TYPE_XMPP,
+    LOG_APP_STARTING,
+    LOG_APP_STOPPED,
+    PLUGIN_DATA_FTP_SERVICE,
+)
 from business_assistant.config.settings import load_settings
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.loader import load_plugins
@@ -35,6 +40,12 @@ class Application:
         memory = MemoryStore(settings.memory_file)
 
         plugin_data: dict = {}
+
+        if settings.ftp:
+            from business_assistant.upload.ftp_service import FtpUploadService
+
+            plugin_data[PLUGIN_DATA_FTP_SERVICE] = FtpUploadService(settings.ftp)
+
         registry = PluginRegistry(plugin_data=plugin_data)
         load_plugins(registry, settings.plugin_names)
 

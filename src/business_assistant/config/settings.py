@@ -9,10 +9,18 @@ from dotenv import load_dotenv
 
 from .constants import (
     DEFAULT_CHAT_LOG_FILE,
+    DEFAULT_FTP_PORT,
     DEFAULT_MAX_CONVERSATION_HISTORY,
     DEFAULT_MEMORY_FILE,
     DEFAULT_OPENAI_MODEL,
     ENV_CHAT_LOG_FILE,
+    ENV_FTP_BASE_PATH,
+    ENV_FTP_BASE_URL,
+    ENV_FTP_HOST,
+    ENV_FTP_PASSWORD,
+    ENV_FTP_PORT,
+    ENV_FTP_USE_TLS,
+    ENV_FTP_USERNAME,
     ENV_MAX_CONVERSATION_HISTORY,
     ENV_MEMORY_FILE,
     ENV_OPENAI_API_KEY,
@@ -44,6 +52,19 @@ class OpenAISettings:
 
 
 @dataclass(frozen=True)
+class FtpSettings:
+    """FTP upload settings."""
+
+    host: str
+    username: str
+    password: str
+    base_path: str
+    base_url: str
+    port: int = DEFAULT_FTP_PORT
+    use_tls: bool = True
+
+
+@dataclass(frozen=True)
 class AppSettings:
     """Top-level application settings."""
 
@@ -53,6 +74,7 @@ class AppSettings:
     chat_log_file: str
     plugin_names: list[str]
     max_conversation_history: int = DEFAULT_MAX_CONVERSATION_HISTORY
+    ftp: FtpSettings | None = None
 
 
 def load_settings() -> AppSettings:
@@ -81,6 +103,19 @@ def load_settings() -> AppSettings:
     raw_plugins = os.environ.get(ENV_PLUGINS, "")
     plugin_names = [name.strip() for name in raw_plugins.split(",") if name.strip()]
 
+    ftp: FtpSettings | None = None
+    ftp_host = os.environ.get(ENV_FTP_HOST, "")
+    if ftp_host:
+        ftp = FtpSettings(
+            host=ftp_host,
+            username=os.environ.get(ENV_FTP_USERNAME, ""),
+            password=os.environ.get(ENV_FTP_PASSWORD, ""),
+            base_path=os.environ.get(ENV_FTP_BASE_PATH, ""),
+            base_url=os.environ.get(ENV_FTP_BASE_URL, ""),
+            port=int(os.environ.get(ENV_FTP_PORT, str(DEFAULT_FTP_PORT))),
+            use_tls=os.environ.get(ENV_FTP_USE_TLS, "true").lower() in ("true", "1", "yes"),
+        )
+
     return AppSettings(
         xmpp=xmpp,
         openai=openai,
@@ -93,4 +128,5 @@ def load_settings() -> AppSettings:
                 str(DEFAULT_MAX_CONVERSATION_HISTORY),
             )
         ),
+        ftp=ftp,
     )
