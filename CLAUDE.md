@@ -28,7 +28,7 @@ Plugin-based XMPP chatbot using PydanticAI + bot-commander. Source code in `src/
 
 ## Restarting the Bot
 
-The bot supports file-based restart. After making code changes to plugins or the bot itself, trigger a restart by creating a sentinel file:
+The bot supports file-based restart. After making code changes to plugins or the bot itself, always trigger a restart by creating the sentinel file:
 
 ```bash
 touch restart.flag
@@ -50,6 +50,10 @@ powershell -Command "cd 'D:\GIT\BenjaminKobjolke\business-assistant-v2'; cmd /c 
 ```
 
 Fix any reported issues before committing.
+
+## Git Commands
+
+Never use compound commands (`cd /path && git ...`) with git. Run all git commands directly without `cd` prefixes. If you need to operate on a different repo, use separate commands.
 
 ## Rules
 
