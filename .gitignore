@@ -214,3 +214,6 @@ data
 # Code analysis
 tools/analyze_code_config.bat
 code_analysis_results/
+
+# Runtime feedback reports
+feedback/

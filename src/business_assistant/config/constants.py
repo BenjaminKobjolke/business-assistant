@@ -31,8 +31,20 @@ BOT_TYPE_XMPP = "xmpp"
 ERR_AGENT_FAILED = "Sorry, I encountered an error processing your message. Please try again."
 ERR_PLUGIN_LOAD_FAILED = "Failed to load plugin: {name}"
 
+# Chat commands (matched case-insensitive)
+CMD_CLEAR = {"clear", "clear chat", "clear chat history"}
+CMD_RESTART = {"restart", "restart chat"}
+
+# Command responses
+RESP_CHAT_CLEARED = "Chat history cleared."
+RESP_RESTART_TRIGGERED = "Restarting... please wait a moment."
+
 # Restart
 RESTART_FLAG_FILE = "restart.flag"
+
+# Feedback
+DEFAULT_FEEDBACK_DIR = "feedback"
+ENV_FEEDBACK_DIR = "FEEDBACK_DIR"
 
 # Logging environment variables
 ENV_LOG_LEVEL = "LOG_LEVEL"
@@ -63,6 +75,10 @@ You communicate via XMPP chat. Keep responses concise and well-formatted for cha
 
 When a user mentions a person's name, check your memory for any stored aliases or contact \
 information before performing searches.
+
+If you encounter a problem with a tool (e.g. a function returns an error, unexpected behavior, \
+or you cannot fulfill a request due to tool limitations), use the write_feedback tool to document \
+the issue for the developer. Include what you tried, what happened, and what you expected.
 
 Current memory contents:
 {memory_contents}

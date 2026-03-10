@@ -14,8 +14,13 @@ from pydantic_ai.messages import ModelRequest, RetryPromptPart, ToolReturnPart
 
 from business_assistant.agent.deps import Deps
 from business_assistant.config.constants import (
+    CMD_CLEAR,
+    CMD_RESTART,
     ERR_AGENT_FAILED,
     LOG_AGENT_ERROR,
+    RESP_CHAT_CLEARED,
+    RESP_RESTART_TRIGGERED,
+    RESTART_FLAG_FILE,
 )
 from business_assistant.config.settings import AppSettings
 from business_assistant.memory.store import MemoryStore
@@ -52,6 +57,10 @@ class AIMessageHandler:
 
         Runs agent.run_sync() in a separate thread to avoid event loop conflicts.
         """
+        cmd_response = self._handle_command(message.text.strip(), message.user_id)
+        if cmd_response is not None:
+            return cmd_response
+
         try:
             deps = Deps(
                 memory=self._memory,
@@ -81,6 +90,19 @@ class AIMessageHandler:
         """Run the PydanticAI agent synchronously (called from thread pool)."""
         result = self._agent.run_sync(text, deps=deps, message_history=message_history)
         return result.output, result.all_messages()
+
+    def _handle_command(self, text: str, user_id: str) -> BotResponse | None:
+        """Check for special chat commands. Returns a BotResponse or None."""
+        normalized = text.lower().strip()
+        if normalized in CMD_CLEAR:
+            self._histories.pop(user_id, None)
+            logger.info("Chat history cleared for user %s", user_id)
+            return BotResponse(text=RESP_CHAT_CLEARED)
+        if normalized in CMD_RESTART:
+            Path(RESTART_FLAG_FILE).touch()
+            logger.info("Restart requested by user %s", user_id)
+            return BotResponse(text=RESP_RESTART_TRIGGERED)
+        return None
 
     def _log_chat(self, user: str, input_text: str, output_text: str, *, error: bool) -> None:
         """Append a JSON line to the chat log file."""

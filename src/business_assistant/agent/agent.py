@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
+import logging
+import os
+import re
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from pydantic_ai import Agent, RunContext, Tool
 
+from business_assistant.config.constants import DEFAULT_FEEDBACK_DIR, ENV_FEEDBACK_DIR
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.registry import PluginRegistry
 
 from .deps import Deps
 from .system_prompt import build_system_prompt
+
+logger = logging.getLogger(__name__)
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 def _memory_get(ctx: RunContext[Deps], key: str) -> str:
@@ -43,6 +53,38 @@ def _memory_list(ctx: RunContext[Deps]) -> str:
     return "Stored memories:\n" + "\n".join(lines)
 
 
+def _resolve_feedback_dir() -> Path:
+    """Resolve the feedback directory against the project root."""
+    raw = os.environ.get(ENV_FEEDBACK_DIR, DEFAULT_FEEDBACK_DIR)
+    p = Path(raw)
+    if p.is_absolute():
+        return p
+    return _PROJECT_ROOT / p
+
+
+_SAFE_FILENAME_RE = re.compile(r"[^\w\-]")
+
+
+def _write_feedback(ctx: RunContext[Deps], title: str, content: str) -> str:
+    """Write a diagnostic feedback report about a tool problem for the developer."""
+    feedback_dir = _resolve_feedback_dir()
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H-%M-%S")
+    safe_title = _SAFE_FILENAME_RE.sub("_", title)[:60]
+    filename = f"{ts}_{safe_title}.md"
+
+    report = f"# Feedback: {title}\n\n"
+    report += f"**Timestamp:** {ts}\n"
+    report += f"**User:** {ctx.deps.user_id}\n\n"
+    report += f"## Details\n\n{content}\n"
+
+    filepath = feedback_dir / filename
+    filepath.write_text(report, encoding="utf-8")
+    logger.info("Feedback written to %s", filepath)
+    return f"Feedback saved: {filename}"
+
+
 def create_agent(
     registry: PluginRegistry,
     memory: MemoryStore,
@@ -67,7 +109,15 @@ def create_agent(
         Tool(_memory_list, name="memory_list", description="List all stored memories."),
     ]
 
-    all_tools = memory_tools + registry.all_tools()
+    feedback_tools = [
+        Tool(
+            _write_feedback,
+            name="write_feedback",
+            description="Write a diagnostic feedback report about a tool problem.",
+        ),
+    ]
+
+    all_tools = memory_tools + feedback_tools + registry.all_tools()
     system_prompt = build_system_prompt(registry, memory)
 
     return Agent(

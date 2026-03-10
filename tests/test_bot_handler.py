@@ -17,7 +17,11 @@ from pydantic_ai.messages import (
 )
 
 from business_assistant.bot.handler import AIMessageHandler, _safe_truncate
-from business_assistant.config.constants import ERR_AGENT_FAILED
+from business_assistant.config.constants import (
+    ERR_AGENT_FAILED,
+    RESP_CHAT_CLEARED,
+    RESP_RESTART_TRIGGERED,
+)
 from business_assistant.config.settings import AppSettings, OpenAISettings, XmppSettings
 from business_assistant.memory.store import MemoryStore
 
@@ -213,3 +217,69 @@ class TestSafeTruncate:
         ]
         result = _safe_truncate(history, max_len=2)
         assert result == []
+
+
+class TestChatCommands:
+    def test_clear_resets_history(self, tmp_memory_file: str) -> None:
+        handler = _make_handler(agent_result="Reply", tmp_memory_file=tmp_memory_file)
+        handler.handle(BotMessage(user_id="user@test.com", text="First"))
+        assert "user@test.com" in handler._histories
+
+        response = handler.handle(BotMessage(user_id="user@test.com", text="clear"))
+        assert response.text == RESP_CHAT_CLEARED
+        assert "user@test.com" not in handler._histories
+
+    def test_clear_chat_history_variant(self, tmp_memory_file: str) -> None:
+        handler = _make_handler(agent_result="Reply", tmp_memory_file=tmp_memory_file)
+        handler.handle(BotMessage(user_id="user@test.com", text="First"))
+
+        response = handler.handle(
+            BotMessage(user_id="user@test.com", text="clear chat history")
+        )
+        assert response.text == RESP_CHAT_CLEARED
+
+    def test_clear_is_case_insensitive(self, tmp_memory_file: str) -> None:
+        handler = _make_handler(agent_result="Reply", tmp_memory_file=tmp_memory_file)
+        handler.handle(BotMessage(user_id="user@test.com", text="First"))
+
+        response = handler.handle(BotMessage(user_id="user@test.com", text="CLEAR"))
+        assert response.text == RESP_CHAT_CLEARED
+
+    def test_restart_creates_flag(self, tmp_path, tmp_memory_file: str) -> None:
+        handler = _make_handler(tmp_memory_file=tmp_memory_file)
+        flag = tmp_path / "restart.flag"
+
+        import business_assistant.bot.handler as handler_mod
+
+        orig = handler_mod.RESTART_FLAG_FILE
+        handler_mod.RESTART_FLAG_FILE = str(flag)
+        try:
+            response = handler.handle(BotMessage(user_id="user@test.com", text="restart"))
+            assert response.text == RESP_RESTART_TRIGGERED
+            assert flag.exists()
+        finally:
+            handler_mod.RESTART_FLAG_FILE = orig
+            flag.unlink(missing_ok=True)
+
+    def test_restart_chat_variant(self, tmp_path, tmp_memory_file: str) -> None:
+        handler = _make_handler(tmp_memory_file=tmp_memory_file)
+        flag = tmp_path / "restart.flag"
+
+        import business_assistant.bot.handler as handler_mod
+
+        orig = handler_mod.RESTART_FLAG_FILE
+        handler_mod.RESTART_FLAG_FILE = str(flag)
+        try:
+            response = handler.handle(
+                BotMessage(user_id="user@test.com", text="restart chat")
+            )
+            assert response.text == RESP_RESTART_TRIGGERED
+        finally:
+            handler_mod.RESTART_FLAG_FILE = orig
+            flag.unlink(missing_ok=True)
+
+    def test_normal_message_not_intercepted(self, tmp_memory_file: str) -> None:
+        handler = _make_handler(agent_result="Hi!", tmp_memory_file=tmp_memory_file)
+        response = handler.handle(BotMessage(user_id="user@test.com", text="hello"))
+        assert response.text == "Hi!"
+        handler._agent.run_sync.assert_called_once()
