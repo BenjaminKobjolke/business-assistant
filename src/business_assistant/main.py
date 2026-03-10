@@ -9,6 +9,7 @@ from pathlib import Path
 
 from business_assistant.bot.app import Application
 from business_assistant.config.constants import LOG_APP_RESTARTING, RESTART_FLAG_FILE
+from business_assistant.config.log_setup import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +43,7 @@ def main() -> None:
 
     SIGINT / SIGTERM cause a clean exit (no restart).
     """
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    )
+    setup_logging()
 
     restart_flag = Path(RESTART_FLAG_FILE)
 
