@@ -184,6 +184,8 @@ class TestDraftReplyFlow:
                 settings=settings,
                 plugin_data=registry.plugin_data,
             )
+            # Multi-turn test needs longer timeout than default 120s
+            handler._timeout = 300
 
             # -- Step 1: Ask about latest inbox email -------------------------
             r1 = handler.handle(

@@ -36,6 +36,8 @@ class AIMessageHandler:
     Maintains per-user conversation history for multi-turn context.
     """
 
+    _TIMEOUT: int = 120
+
     def __init__(
         self,
         agent: Agent[Deps, str],
@@ -47,6 +49,7 @@ class AIMessageHandler:
         self._memory = memory
         self._settings = settings
         self._plugin_data = plugin_data or {}
+        self._timeout = self._TIMEOUT
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._chat_log_path = Path(settings.chat_log_file)
         self._chat_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -75,7 +78,7 @@ class AIMessageHandler:
                 deps,
                 history,
             )
-            output, new_history = future.result(timeout=120)
+            output, new_history = future.result(timeout=self._timeout)
             self._histories[message.user_id] = _safe_truncate(
                 new_history, self._settings.max_conversation_history
             )

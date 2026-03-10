@@ -7,7 +7,9 @@ Plugin-based XMPP chatbot using PydanticAI + bot-commander. Source code in `src/
 ## Commands
 
 - `uv sync --all-extras` — Install dependencies
-- `uv run pytest tests/ -v` — Run tests
+- `uv run pytest tests/ -v` — Run all tests
+- `uv run pytest tests/ -v --ignore=tests/integration` — Run unit tests
+- `uv run pytest tests/integration/ -v` — Run integration tests (requires OPENAI_API_KEY)
 - `uv run ruff check src/ tests/` — Lint
 - `uv run mypy src/` — Type check
 - `uv run python -m business_assistant.main` — Start the app
@@ -41,13 +43,24 @@ The bot polls for `restart.flag` every 5 seconds. When detected, it:
 
 SIGINT (Ctrl+C) or SIGTERM cause a clean exit without restart.
 
-## Code Analysis
+## Testing After Changes
 
-After implementing new features or making significant changes, run the code analysis:
+After implementing features or making significant changes, run tests in this order:
 
-```bash
-powershell -Command "cd 'D:\GIT\BenjaminKobjolke\business-assistant-v2'; cmd /c '.\tools\analyze_code.bat'"
-```
+1. **Unit tests** (both repos):
+   - `cd business-assistant-imap-plugin && uv run pytest tests/ -v`
+   - `cd business-assistant-v2 && uv run pytest tests/ -v --ignore=tests/integration`
+
+2. **Lint** (both repos):
+   - `uv run ruff check src/ tests/`
+
+3. **Integration tests** (require OPENAI_API_KEY in .env):
+   - `uv run pytest tests/integration/ -v`
+   - These test AI decision-making with real OpenAI API + mocked services
+   - If an integration test fails, the system prompt likely needs adjustment
+
+4. **Code analysis**:
+   - `powershell -Command "cd 'D:\GIT\BenjaminKobjolke\business-assistant-v2'; cmd /c '.\tools\analyze_code.bat'"`
 
 Fix any reported issues before committing.
 
