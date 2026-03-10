@@ -85,7 +85,7 @@ class Application:
         load_plugins(registry, settings.plugin_names)
 
         model_name = f"openai:{settings.openai.model}"
-        agent = create_agent(registry, memory, model_name)
+        agent = create_agent(registry, memory, model_name, timezone=settings.timezone)
 
         tool_plugin_map = registry.tool_plugin_map()
         for name in ("memory_get", "memory_set", "memory_delete", "memory_list", "write_feedback"):

@@ -16,7 +16,7 @@ from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.registry import PluginRegistry
 
 from .deps import Deps
-from .system_prompt import build_system_prompt
+from .system_prompt import build_system_prompt, build_time_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,7 @@ def create_agent(
     registry: PluginRegistry,
     memory: MemoryStore,
     model: Any,
+    timezone: str = "Europe/Berlin",
 ) -> Agent[Deps, str]:
     """Create and configure the PydanticAI agent with all tools.
 
@@ -96,6 +97,7 @@ def create_agent(
         registry: Plugin registry containing plugin tools.
         memory: Memory store for the memory tools.
         model: The model name (e.g. 'openai:gpt-4o').
+        timezone: IANA timezone name for current-time display.
 
     Returns:
         Configured PydanticAI Agent.
@@ -118,12 +120,18 @@ def create_agent(
     ]
 
     all_tools = memory_tools + feedback_tools + registry.all_tools()
-    system_prompt = build_system_prompt(registry, memory)
+    static_prompt = build_system_prompt(registry, memory)
 
-    return Agent(
+    agent = Agent(
         model,
-        system_prompt=system_prompt,
+        system_prompt=static_prompt,
         tools=all_tools,
         output_type=str,
         deps_type=Deps,
     )
+
+    @agent.system_prompt
+    def _time_prompt() -> str:
+        return build_time_prompt(timezone)
+
+    return agent

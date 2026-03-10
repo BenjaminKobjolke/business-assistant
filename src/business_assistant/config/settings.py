@@ -15,6 +15,7 @@ from .constants import (
     DEFAULT_OPENAI_MODEL,
     DEFAULT_UPLOAD_DIR,
     DEFAULT_USAGE_LOG_FILE,
+    DEFAULT_USER_TIMEZONE,
     ENV_CHAT_LOG_FILE,
     ENV_FTP_BASE_PATH,
     ENV_FTP_BASE_URL,
@@ -30,6 +31,7 @@ from .constants import (
     ENV_PLUGINS,
     ENV_UPLOAD_DIR,
     ENV_USAGE_LOG_FILE,
+    ENV_USER_TIMEZONE,
     ENV_XMPP_ALLOWED_JIDS,
     ENV_XMPP_DEFAULT_RECEIVER,
     ENV_XMPP_JID,
@@ -78,6 +80,7 @@ class AppSettings:
     chat_log_file: str
     usage_log_file: str
     plugin_names: list[str]
+    timezone: str = DEFAULT_USER_TIMEZONE
     upload_dir: str = DEFAULT_UPLOAD_DIR
     max_conversation_history: int = DEFAULT_MAX_CONVERSATION_HISTORY
     ftp: FtpSettings | None = None
@@ -128,6 +131,7 @@ def load_settings() -> AppSettings:
         memory_file=os.environ.get(ENV_MEMORY_FILE, DEFAULT_MEMORY_FILE),
         chat_log_file=os.environ.get(ENV_CHAT_LOG_FILE, DEFAULT_CHAT_LOG_FILE),
         usage_log_file=os.environ.get(ENV_USAGE_LOG_FILE, DEFAULT_USAGE_LOG_FILE),
+        timezone=os.environ.get(ENV_USER_TIMEZONE, DEFAULT_USER_TIMEZONE),
         upload_dir=os.environ.get(ENV_UPLOAD_DIR, DEFAULT_UPLOAD_DIR),
         plugin_names=plugin_names,
         max_conversation_history=int(
