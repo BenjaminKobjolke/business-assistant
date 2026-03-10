@@ -5,10 +5,11 @@ from __future__ import annotations
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from business_assistant.config.log_setup import (
     LoggingSettings,
+    _clear_log_file,
     _close_file_handlers,
     _load_logging_settings,
     _resolve_log_dir,
@@ -84,6 +85,33 @@ class TestCloseFileHandlers:
             logging.getLogger(ns).handlers.clear()
 
 
+class TestClearLogFile:
+    def test_deletes_existing_file(self, tmp_path) -> None:
+        log_file = tmp_path / "old.log"
+        log_file.write_text("old content")
+        _clear_log_file(log_file)
+        assert not log_file.exists()
+
+    def test_noop_when_missing(self, tmp_path) -> None:
+        log_file = tmp_path / "missing.log"
+        _clear_log_file(log_file)  # should not raise
+        assert not log_file.exists()
+
+    def test_truncates_when_locked(self, tmp_path) -> None:
+        log_file = tmp_path / "locked.log"
+        log_file.write_text("old content")
+        with patch.object(Path, "unlink", side_effect=PermissionError):
+            _clear_log_file(log_file)
+        assert log_file.read_text() == ""
+
+    def test_silent_when_fully_locked(self, tmp_path) -> None:
+        log_file = tmp_path / "locked.log"
+        log_file.write_text("old content")
+        with patch.object(Path, "unlink", side_effect=PermissionError), \
+             patch.object(Path, "write_text", side_effect=PermissionError):
+            _clear_log_file(log_file)  # should not raise
+
+
 class TestSetupLogging:
     def test_creates_console_handler(self, tmp_path, monkeypatch) -> None:
         monkeypatch.setenv("LOG_DIR", str(tmp_path / "logs"))
@@ -139,6 +167,19 @@ class TestSetupLogging:
         app_log = log_dir / "app" / "app.log"
         assert app_log.exists()
         content = app_log.read_text(encoding="utf-8")
+        assert "File logging initialized" in content
+
+    def test_clears_old_log_file_on_start(self, tmp_path, monkeypatch) -> None:
+        log_dir = tmp_path / "logs"
+        monkeypatch.setenv("LOG_DIR", str(log_dir))
+        app_log = log_dir / "app" / "app.log"
+        app_log.parent.mkdir(parents=True, exist_ok=True)
+        app_log.write_text("old session data")
+
+        setup_logging()
+
+        content = app_log.read_text(encoding="utf-8")
+        assert "old session data" not in content
         assert "File logging initialized" in content
 
     def teardown_method(self) -> None:

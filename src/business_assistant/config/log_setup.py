@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 from dataclasses import dataclass
@@ -19,6 +20,18 @@ from .constants import (
 )
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+
+
+def _clear_log_file(log_path: Path) -> None:
+    """Delete existing log file so each start begins fresh."""
+    if log_path.is_file():
+        try:
+            log_path.unlink()
+        except PermissionError:
+            # On Windows the file may be locked by another process;
+            # truncate it instead so the new session starts clean.
+            with contextlib.suppress(PermissionError):
+                log_path.write_text("")
 
 
 def _resolve_log_dir(raw_dir: str) -> Path:
@@ -96,6 +109,7 @@ def setup_logging() -> None:
 
     app_logger = logging.getLogger("business_assistant")
     _close_file_handlers(app_logger)
+    _clear_log_file(app_log)
     app_handler = _make_daily_handler(app_log, settings.backup_count)
     app_logger.addHandler(app_handler)
 
@@ -120,6 +134,7 @@ def add_plugin_logging(plugin_name: str, logger_namespace: str) -> None:
 
     log_dir = _resolve_log_dir(settings.log_dir)
     log_path = log_dir / plugin_name / f"{plugin_name}.log"
+    _clear_log_file(log_path)
     handler = _make_daily_handler(log_path, settings.backup_count)
     plugin_logger.addHandler(handler)
 
