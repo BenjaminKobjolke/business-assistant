@@ -13,6 +13,7 @@ from .constants import (
     DEFAULT_MAX_CONVERSATION_HISTORY,
     DEFAULT_MEMORY_FILE,
     DEFAULT_OPENAI_MODEL,
+    DEFAULT_UPLOAD_DIR,
     DEFAULT_USAGE_LOG_FILE,
     ENV_CHAT_LOG_FILE,
     ENV_FTP_BASE_PATH,
@@ -27,6 +28,7 @@ from .constants import (
     ENV_OPENAI_API_KEY,
     ENV_OPENAI_MODEL,
     ENV_PLUGINS,
+    ENV_UPLOAD_DIR,
     ENV_USAGE_LOG_FILE,
     ENV_XMPP_ALLOWED_JIDS,
     ENV_XMPP_DEFAULT_RECEIVER,
@@ -76,6 +78,7 @@ class AppSettings:
     chat_log_file: str
     usage_log_file: str
     plugin_names: list[str]
+    upload_dir: str = DEFAULT_UPLOAD_DIR
     max_conversation_history: int = DEFAULT_MAX_CONVERSATION_HISTORY
     ftp: FtpSettings | None = None
 
@@ -125,6 +128,7 @@ def load_settings() -> AppSettings:
         memory_file=os.environ.get(ENV_MEMORY_FILE, DEFAULT_MEMORY_FILE),
         chat_log_file=os.environ.get(ENV_CHAT_LOG_FILE, DEFAULT_CHAT_LOG_FILE),
         usage_log_file=os.environ.get(ENV_USAGE_LOG_FILE, DEFAULT_USAGE_LOG_FILE),
+        upload_dir=os.environ.get(ENV_UPLOAD_DIR, DEFAULT_UPLOAD_DIR),
         plugin_names=plugin_names,
         max_conversation_history=int(
             os.environ.get(

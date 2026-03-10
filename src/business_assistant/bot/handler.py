@@ -19,11 +19,13 @@ from business_assistant.config.constants import (
     CMD_RESTART,
     ERR_AGENT_FAILED,
     LOG_AGENT_ERROR,
+    PLUGIN_DATA_FILE_HANDLERS,
     RESP_CHAT_CLEARED,
     RESP_RESTART_TRIGGERED,
     RESTART_FLAG_FILE,
 )
 from business_assistant.config.settings import AppSettings
+from business_assistant.files.downloader import FileDownloader
 from business_assistant.memory.store import MemoryStore
 from business_assistant.usage.tracker import UsageTracker
 
@@ -46,6 +48,7 @@ class AIMessageHandler:
         plugin_data: dict | None = None,
         usage_tracker: UsageTracker | None = None,
         model_name: str = "",
+        file_downloader: FileDownloader | None = None,
     ) -> None:
         self._agent = agent
         self._memory = memory
@@ -53,6 +56,7 @@ class AIMessageHandler:
         self._plugin_data = plugin_data or {}
         self._usage_tracker = usage_tracker
         self._model_name = model_name
+        self._file_downloader = file_downloader
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._chat_log_path = Path(settings.chat_log_file)
         self._chat_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -68,6 +72,9 @@ class AIMessageHandler:
             return cmd_response
 
         try:
+            file_prefix = self._process_attachments(message)
+            agent_text = file_prefix + message.text if file_prefix else message.text
+
             deps = Deps(
                 memory=self._memory,
                 settings=self._settings,
@@ -77,7 +84,7 @@ class AIMessageHandler:
             history = self._histories.get(message.user_id, [])
             future = self._executor.submit(
                 self._run_agent,
-                message.text,
+                agent_text,
                 deps,
                 history,
             )
@@ -95,6 +102,48 @@ class AIMessageHandler:
             logger.error(LOG_AGENT_ERROR, exc_info=True)
             self._log_chat(message.user_id, message.text, ERR_AGENT_FAILED, error=True)
             return BotResponse(text=ERR_AGENT_FAILED)
+
+    def _process_attachments(self, message: BotMessage) -> str:
+        """Download attachments and run file handlers. Returns context prefix."""
+        if not message.attachments or not self._file_downloader:
+            return ""
+
+        from business_assistant.files.handler_registry import FileHandlerRegistry
+
+        parts: list[str] = []
+        handler_registry: FileHandlerRegistry | None = self._plugin_data.get(
+            PLUGIN_DATA_FILE_HANDLERS
+        )
+
+        for att in message.attachments:
+            try:
+                downloaded = self._file_downloader.download(
+                    att.url, att.filename, att.mime_type
+                )
+                parts.append(
+                    f"[File received: {downloaded.filename} "
+                    f"({downloaded.mime_type or 'unknown'}, {downloaded.size} bytes) "
+                    f"saved to {downloaded.path}]"
+                )
+                if handler_registry and downloaded.mime_type:
+                    for plugin_name, handler_fn in handler_registry.get_handlers(
+                        downloaded.mime_type
+                    ):
+                        try:
+                            result = handler_fn(downloaded, message.user_id)
+                            parts.append(
+                                f"[File processed by {plugin_name}: {result.summary}]"
+                            )
+                        except Exception:
+                            logger.warning(
+                                "File handler %s failed", plugin_name, exc_info=True
+                            )
+            except Exception:
+                logger.warning("Failed to download attachment: %s", att.url, exc_info=True)
+
+        if parts:
+            return "\n".join(parts) + "\n"
+        return ""
 
     def _run_agent(
         self, text: str, deps: Deps, message_history: list

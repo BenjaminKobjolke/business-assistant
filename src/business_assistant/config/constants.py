@@ -51,6 +51,11 @@ ENV_RTM_TOKEN = "RTM_TOKEN"
 DEFAULT_FEEDBACK_DIR = "feedback"
 ENV_FEEDBACK_DIR = "FEEDBACK_DIR"
 
+# File uploads
+DEFAULT_UPLOAD_DIR = "data/uploads"
+ENV_UPLOAD_DIR = "UPLOAD_DIR"
+PLUGIN_DATA_FILE_HANDLERS = "file_handlers"
+
 # FTP environment variables
 ENV_FTP_HOST = "FTP_HOST"
 ENV_FTP_USERNAME = "FTP_USERNAME"
@@ -89,6 +94,8 @@ LOG_APP_STARTING = "Starting Business Assistant v2"
 LOG_APP_STOPPED = "Business Assistant v2 stopped"
 LOG_APP_RESTARTING = "Restart requested via restart.flag — restarting..."
 LOG_AGENT_ERROR = "Error running AI agent"
+LOG_FILE_DOWNLOADED = "Downloaded file: %s (%d bytes)"
+LOG_FILE_DOWNLOAD_FAILED = "Failed to download file from %s"
 
 # System prompt
 SYSTEM_PROMPT_BASE = """You are a helpful business assistant. You help users manage their work \

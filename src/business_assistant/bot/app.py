@@ -22,6 +22,7 @@ from business_assistant.config.constants import (
     RTM_TOKEN_FILE,
 )
 from business_assistant.config.settings import load_settings
+from business_assistant.files.downloader import FileDownloader
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.loader import load_plugins
 from business_assistant.plugins.registry import PluginRegistry
@@ -90,6 +91,7 @@ class Application:
         for name in ("memory_get", "memory_set", "memory_delete", "memory_list", "write_feedback"):
             tool_plugin_map[name] = CORE_PLUGIN_NAME
         usage_tracker = UsageTracker(settings.usage_log_file, tool_plugin_map)
+        downloader = FileDownloader(settings.upload_dir)
 
         handler = AIMessageHandler(
             agent=agent,
@@ -98,6 +100,7 @@ class Application:
             plugin_data=plugin_data,
             usage_tracker=usage_tracker,
             model_name=settings.openai.model,
+            file_downloader=downloader,
         )
 
         config_provider = SettingsConfigProvider(settings.xmpp)

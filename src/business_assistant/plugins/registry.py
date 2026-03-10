@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+
+from business_assistant.config.constants import PLUGIN_DATA_FILE_HANDLERS
 
 
 @dataclass
@@ -47,6 +50,21 @@ class PluginRegistry:
     def plugin_for_tool(self, tool_name: str, default: str = "core") -> str:
         """Return the plugin name for a tool, or *default* if unknown."""
         return self._tool_plugin_map.get(tool_name, default)
+
+    def register_file_handler(
+        self,
+        mime_patterns: list[str],
+        plugin_name: str,
+        handler: Callable,
+    ) -> None:
+        """Register a file type handler. Creates FileHandlerRegistry in plugin_data if needed."""
+        from business_assistant.files.handler_registry import FileHandlerRegistry
+
+        if PLUGIN_DATA_FILE_HANDLERS not in self.plugin_data:
+            self.plugin_data[PLUGIN_DATA_FILE_HANDLERS] = FileHandlerRegistry()
+        self.plugin_data[PLUGIN_DATA_FILE_HANDLERS].register(
+            mime_patterns, plugin_name, handler
+        )
 
     @property
     def plugins(self) -> list[PluginInfo]:
