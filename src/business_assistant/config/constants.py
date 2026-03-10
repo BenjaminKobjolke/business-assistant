@@ -42,6 +42,11 @@ RESP_RESTART_TRIGGERED = "Restarting... please wait a moment."
 # Restart
 RESTART_FLAG_FILE = "restart.flag"
 
+# Credential files (auto-generated tokens stored in data/)
+CREDENTIAL_DIR = "data"
+RTM_TOKEN_FILE = "rtm_token"
+ENV_RTM_TOKEN = "RTM_TOKEN"
+
 # Feedback
 DEFAULT_FEEDBACK_DIR = "feedback"
 ENV_FEEDBACK_DIR = "FEEDBACK_DIR"

@@ -5,15 +5,20 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import os
+from pathlib import Path
 
 from bot_commander.manager import BotManager
 
 from business_assistant.agent.agent import create_agent
 from business_assistant.config.constants import (
     BOT_TYPE_XMPP,
+    CREDENTIAL_DIR,
+    ENV_RTM_TOKEN,
     LOG_APP_STARTING,
     LOG_APP_STOPPED,
     PLUGIN_DATA_FTP_SERVICE,
+    RTM_TOKEN_FILE,
 )
 from business_assistant.config.settings import load_settings
 from business_assistant.memory.store import MemoryStore
@@ -25,6 +30,31 @@ from .handler import AIMessageHandler
 
 logger = logging.getLogger(__name__)
 
+# Mapping of credential files to env var names.
+_CREDENTIAL_FILES: dict[str, str] = {
+    RTM_TOKEN_FILE: ENV_RTM_TOKEN,
+}
+
+
+def _load_credential_files(project_root: Path | None = None) -> None:
+    """Load auto-generated credential files from data/ into environment variables.
+
+    Only sets a variable if the file exists and the variable is not already set.
+    """
+    if project_root is None:
+        project_root = Path(__file__).resolve().parents[3]
+    cred_dir = project_root / CREDENTIAL_DIR
+
+    for filename, env_var in _CREDENTIAL_FILES.items():
+        if os.environ.get(env_var):
+            continue
+        filepath = cred_dir / filename
+        if filepath.is_file():
+            value = filepath.read_text(encoding="utf-8").strip()
+            if value:
+                os.environ[env_var] = value
+                logger.info("Loaded %s from %s", env_var, filepath)
+
 
 class Application:
     """Main application — orchestrates startup, wiring, and shutdown."""
@@ -35,6 +65,8 @@ class Application:
     def start(self) -> None:
         """Load settings, plugins, create agent, and start the XMPP bot."""
         logger.info(LOG_APP_STARTING)
+
+        _load_credential_files()
 
         settings = load_settings()
         memory = MemoryStore(settings.memory_file)
