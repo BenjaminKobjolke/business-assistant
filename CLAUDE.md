@@ -43,6 +43,8 @@ The bot polls for `restart.flag` every 5 seconds. When detected, it:
 
 SIGINT (Ctrl+C) or SIGTERM cause a clean exit without restart.
 
+**Important:** `restart.flag` only reloads code changes in already-loaded plugins. When activating a new plugin (adding to `PLUGINS` in `.env` or installing a new plugin package), you must fully stop and restart the bot process (Ctrl+C, then `uv run python -m business_assistant.main`).
+
 ## Testing After Changes
 
 After implementing features or making significant changes, run tests in this order:
