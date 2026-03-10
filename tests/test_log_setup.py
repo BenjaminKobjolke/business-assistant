@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from logging.handlers import RotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -20,7 +20,7 @@ from business_assistant.config.log_setup import (
 class TestLoggingSettings:
     def test_frozen(self) -> None:
         settings = LoggingSettings(
-            level="INFO", log_dir="logs", max_bytes=1024, backup_count=2
+            level="INFO", log_dir="logs", backup_count=2
         )
         try:
             settings.level = "DEBUG"  # type: ignore[misc]
@@ -30,23 +30,20 @@ class TestLoggingSettings:
         assert raised
 
     def test_defaults(self, monkeypatch) -> None:
-        for key in ["LOG_LEVEL", "LOG_DIR", "LOG_MAX_BYTES", "LOG_BACKUP_COUNT"]:
+        for key in ["LOG_LEVEL", "LOG_DIR", "LOG_BACKUP_COUNT"]:
             monkeypatch.delenv(key, raising=False)
         settings = _load_logging_settings()
         assert settings.level == "INFO"
         assert settings.log_dir == "logs"
-        assert settings.max_bytes == 5_242_880
         assert settings.backup_count == 3
 
     def test_env_overrides(self, monkeypatch) -> None:
         monkeypatch.setenv("LOG_LEVEL", "debug")
         monkeypatch.setenv("LOG_DIR", "/tmp/custom_logs")
-        monkeypatch.setenv("LOG_MAX_BYTES", "1024")
         monkeypatch.setenv("LOG_BACKUP_COUNT", "5")
         settings = _load_logging_settings()
         assert settings.level == "DEBUG"
         assert settings.log_dir == "/tmp/custom_logs"
-        assert settings.max_bytes == 1024
         assert settings.backup_count == 5
 
 
@@ -63,9 +60,9 @@ class TestResolveLogDir:
 
 
 class TestCloseFileHandlers:
-    def test_closes_and_removes_rotating_handlers(self) -> None:
-        logger = logging.getLogger("test_close_rotating")
-        mock_handler = MagicMock(spec=RotatingFileHandler)
+    def test_closes_and_removes_timed_handlers(self) -> None:
+        logger = logging.getLogger("test_close_timed")
+        mock_handler = MagicMock(spec=TimedRotatingFileHandler)
         logger.addHandler(mock_handler)
 
         _close_file_handlers(logger)
@@ -83,7 +80,7 @@ class TestCloseFileHandlers:
         assert stream_handler in logger.handlers
 
     def teardown_method(self) -> None:
-        for ns in ["test_close_rotating", "test_close_preserve"]:
+        for ns in ["test_close_timed", "test_close_preserve"]:
             logging.getLogger(ns).handlers.clear()
 
 
@@ -94,7 +91,7 @@ class TestSetupLogging:
         root = logging.getLogger()
         console_handlers = [
             h for h in root.handlers if isinstance(h, logging.StreamHandler)
-            and not isinstance(h, RotatingFileHandler)
+            and not isinstance(h, TimedRotatingFileHandler)
         ]
         assert len(console_handlers) >= 1
 
@@ -108,7 +105,9 @@ class TestSetupLogging:
         monkeypatch.setenv("LOG_DIR", str(tmp_path / "logs"))
         setup_logging()
         app_logger = logging.getLogger("business_assistant")
-        file_handlers = [h for h in app_logger.handlers if isinstance(h, RotatingFileHandler)]
+        file_handlers = [
+            h for h in app_logger.handlers if isinstance(h, TimedRotatingFileHandler)
+        ]
         assert len(file_handlers) >= 1
 
     def test_clears_handlers_on_repeated_calls(self, tmp_path, monkeypatch) -> None:
@@ -118,7 +117,7 @@ class TestSetupLogging:
         root = logging.getLogger()
         console_handlers = [
             h for h in root.handlers if isinstance(h, logging.StreamHandler)
-            and not isinstance(h, RotatingFileHandler)
+            and not isinstance(h, TimedRotatingFileHandler)
         ]
         # Should have exactly 1 console handler, not 2
         assert len(console_handlers) == 1
@@ -128,7 +127,9 @@ class TestSetupLogging:
         setup_logging()
         setup_logging()
         app_logger = logging.getLogger("business_assistant")
-        file_handlers = [h for h in app_logger.handlers if isinstance(h, RotatingFileHandler)]
+        file_handlers = [
+            h for h in app_logger.handlers if isinstance(h, TimedRotatingFileHandler)
+        ]
         assert len(file_handlers) == 1
 
     def test_verification_message_written(self, tmp_path, monkeypatch) -> None:
@@ -146,7 +147,7 @@ class TestSetupLogging:
         root.handlers.clear()
         app_logger = logging.getLogger("business_assistant")
         for h in app_logger.handlers[:]:
-            if isinstance(h, RotatingFileHandler):
+            if isinstance(h, TimedRotatingFileHandler):
                 h.close()
         app_logger.handlers.clear()
 
@@ -164,7 +165,9 @@ class TestAddPluginLogging:
         ns = "test_plugin_ns_handler"
         add_plugin_logging("testplugin2", ns)
         plugin_logger = logging.getLogger(ns)
-        file_handlers = [h for h in plugin_logger.handlers if isinstance(h, RotatingFileHandler)]
+        file_handlers = [
+            h for h in plugin_logger.handlers if isinstance(h, TimedRotatingFileHandler)
+        ]
         assert len(file_handlers) == 1
 
     def test_idempotent(self, tmp_path, monkeypatch) -> None:
@@ -173,7 +176,7 @@ class TestAddPluginLogging:
         add_plugin_logging("testplugin3", ns)
         first_logger = logging.getLogger(ns)
         first_handlers = [
-            h for h in first_logger.handlers if isinstance(h, RotatingFileHandler)
+            h for h in first_logger.handlers if isinstance(h, TimedRotatingFileHandler)
         ]
         assert len(first_handlers) == 1
         old_handler = first_handlers[0]
@@ -181,7 +184,7 @@ class TestAddPluginLogging:
         # Second call should close old handler and add a fresh one
         add_plugin_logging("testplugin3", ns)
         new_handlers = [
-            h for h in first_logger.handlers if isinstance(h, RotatingFileHandler)
+            h for h in first_logger.handlers if isinstance(h, TimedRotatingFileHandler)
         ]
         assert len(new_handlers) == 1
         assert new_handlers[0] is not old_handler
@@ -230,6 +233,6 @@ class TestAddPluginLogging:
         ]:
             logger = logging.getLogger(ns)
             for h in logger.handlers[:]:
-                if isinstance(h, RotatingFileHandler):
+                if isinstance(h, TimedRotatingFileHandler):
                     h.close()
             logger.handlers.clear()

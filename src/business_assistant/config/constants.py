@@ -66,16 +66,19 @@ DEFAULT_FTP_PORT = 21
 # Plugin data key
 PLUGIN_DATA_FTP_SERVICE = "ftp_upload"
 
+# Usage tracking
+ENV_USAGE_LOG_FILE = "USAGE_LOG_FILE"
+DEFAULT_USAGE_LOG_FILE = "data/usage.log"
+CORE_PLUGIN_NAME = "core"
+
 # Logging environment variables
 ENV_LOG_LEVEL = "LOG_LEVEL"
 ENV_LOG_DIR = "LOG_DIR"
-ENV_LOG_MAX_BYTES = "LOG_MAX_BYTES"
 ENV_LOG_BACKUP_COUNT = "LOG_BACKUP_COUNT"
 
 # Logging defaults
 DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_LOG_DIR = "logs"
-DEFAULT_LOG_MAX_BYTES = 5_242_880  # 5 MB
 DEFAULT_LOG_BACKUP_COUNT = 3
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 

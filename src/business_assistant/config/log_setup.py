@@ -1,22 +1,20 @@
-"""Centralized logging configuration with per-component rotating log files."""
+"""Centralized logging configuration with per-component daily log files."""
 
 from __future__ import annotations
 
 import logging
 import os
 from dataclasses import dataclass
-from logging.handlers import RotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 from .constants import (
     DEFAULT_LOG_BACKUP_COUNT,
     DEFAULT_LOG_DIR,
     DEFAULT_LOG_LEVEL,
-    DEFAULT_LOG_MAX_BYTES,
     ENV_LOG_BACKUP_COUNT,
     ENV_LOG_DIR,
     ENV_LOG_LEVEL,
-    ENV_LOG_MAX_BYTES,
     LOG_FORMAT,
 )
 
@@ -32,9 +30,9 @@ def _resolve_log_dir(raw_dir: str) -> Path:
 
 
 def _close_file_handlers(target_logger: logging.Logger) -> None:
-    """Close and remove all RotatingFileHandlers from *target_logger*."""
+    """Close and remove all TimedRotatingFileHandlers from *target_logger*."""
     for h in target_logger.handlers[:]:
-        if isinstance(h, RotatingFileHandler):
+        if isinstance(h, TimedRotatingFileHandler):
             h.close()
             target_logger.removeHandler(h)
 
@@ -45,7 +43,6 @@ class LoggingSettings:
 
     level: str
     log_dir: str
-    max_bytes: int
     backup_count: int
 
 
@@ -54,21 +51,19 @@ def _load_logging_settings() -> LoggingSettings:
     return LoggingSettings(
         level=os.environ.get(ENV_LOG_LEVEL, DEFAULT_LOG_LEVEL).upper(),
         log_dir=os.environ.get(ENV_LOG_DIR, DEFAULT_LOG_DIR),
-        max_bytes=int(os.environ.get(ENV_LOG_MAX_BYTES, DEFAULT_LOG_MAX_BYTES)),
         backup_count=int(os.environ.get(ENV_LOG_BACKUP_COUNT, DEFAULT_LOG_BACKUP_COUNT)),
     )
 
 
-def _make_rotating_handler(
+def _make_daily_handler(
     log_path: Path,
-    max_bytes: int,
     backup_count: int,
-) -> RotatingFileHandler:
-    """Create a RotatingFileHandler, ensuring the parent directory exists."""
+) -> TimedRotatingFileHandler:
+    """Create a TimedRotatingFileHandler that rotates at midnight."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    handler = RotatingFileHandler(
+    handler = TimedRotatingFileHandler(
         str(log_path),
-        maxBytes=max_bytes,
+        when="midnight",
         backupCount=backup_count,
         encoding="utf-8",
     )
@@ -101,22 +96,22 @@ def setup_logging() -> None:
 
     app_logger = logging.getLogger("business_assistant")
     _close_file_handlers(app_logger)
-    app_handler = _make_rotating_handler(app_log, settings.max_bytes, settings.backup_count)
+    app_handler = _make_daily_handler(app_log, settings.backup_count)
     app_logger.addHandler(app_handler)
 
     app_logger.info("File logging initialized: %s", app_log)
 
 
 def add_plugin_logging(plugin_name: str, logger_namespace: str) -> None:
-    """Add a rotating file handler for a plugin namespace.
+    """Add a daily-rotating file handler for a plugin namespace.
 
     Creates ``logs/<plugin_name>/<plugin_name>.log`` and attaches it to
     ``logging.getLogger(logger_namespace)``.  Child loggers inherit the
     handler automatically.  Console output continues via root logger
     inheritance — no duplication.
 
-    Restart-safe: closes any existing ``RotatingFileHandler`` on the target
-    logger before attaching a fresh one.
+    Restart-safe: closes any existing ``TimedRotatingFileHandler`` on the
+    target logger before attaching a fresh one.
     """
     settings = _load_logging_settings()
 
@@ -125,7 +120,7 @@ def add_plugin_logging(plugin_name: str, logger_namespace: str) -> None:
 
     log_dir = _resolve_log_dir(settings.log_dir)
     log_path = log_dir / plugin_name / f"{plugin_name}.log"
-    handler = _make_rotating_handler(log_path, settings.max_bytes, settings.backup_count)
+    handler = _make_daily_handler(log_path, settings.backup_count)
     plugin_logger.addHandler(handler)
 
     plugin_logger.info("Plugin file logging initialized: %s", log_path)
