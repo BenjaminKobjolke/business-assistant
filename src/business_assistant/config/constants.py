@@ -83,6 +83,11 @@ ENV_LOG_LEVEL = "LOG_LEVEL"
 ENV_LOG_DIR = "LOG_DIR"
 ENV_LOG_BACKUP_COUNT = "LOG_BACKUP_COUNT"
 
+# Plugin categories
+CATEGORY_TODO = "todo"
+CATEGORY_EMAIL = "email"
+CATEGORY_CALENDAR = "calendar"
+
 # Logging defaults
 DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_LOG_DIR = "logs"

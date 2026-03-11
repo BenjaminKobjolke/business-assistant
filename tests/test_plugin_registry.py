@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from business_assistant.plugins.registry import PluginInfo, PluginRegistry
+import pytest
+
+from business_assistant.plugins.registry import (
+    PluginCategoryConflictError,
+    PluginInfo,
+    PluginRegistry,
+)
 
 
 class TestPluginRegistry:
@@ -129,3 +135,109 @@ class TestToolPluginMap:
     def test_empty_registry_map(self) -> None:
         registry = PluginRegistry()
         assert registry.tool_plugin_map() == {}
+
+
+class TestPluginCategory:
+    def test_plugin_without_category(self) -> None:
+        registry = PluginRegistry()
+        registry.register(PluginInfo(name="p1", description="P1"), [])
+        assert registry.plugin_for_category("todo") is None
+
+    def test_plugin_with_category(self) -> None:
+        registry = PluginRegistry()
+        info = PluginInfo(name="rtm", description="RTM", category="todo")
+        registry.register(info, [])
+        result = registry.plugin_for_category("todo")
+        assert result is not None
+        assert result.name == "rtm"
+
+    def test_multiple_plugins_different_categories(self) -> None:
+        registry = PluginRegistry()
+        registry.register(
+            PluginInfo(name="rtm", description="RTM", category="todo"), []
+        )
+        registry.register(
+            PluginInfo(name="imap", description="Email", category="email"), []
+        )
+        assert registry.plugin_for_category("todo") is not None
+        assert registry.plugin_for_category("todo").name == "rtm"
+        assert registry.plugin_for_category("email") is not None
+        assert registry.plugin_for_category("email").name == "imap"
+
+    def test_duplicate_category_raises(self) -> None:
+        registry = PluginRegistry()
+        registry.register(
+            PluginInfo(name="rtm", description="RTM", category="todo"), []
+        )
+        with pytest.raises(PluginCategoryConflictError, match="already provided by 'rtm'"):
+            registry.register(
+                PluginInfo(name="other_todo", description="Other", category="todo"), []
+            )
+
+    def test_validate_requirements_satisfied(self) -> None:
+        registry = PluginRegistry()
+        registry.register(
+            PluginInfo(name="rtm", description="RTM", category="todo"), []
+        )
+        registry.register(
+            PluginInfo(
+                name="dep",
+                description="Depends on todo",
+                required_categories=("todo",),
+            ),
+            [],
+        )
+        assert registry.validate_category_requirements() == []
+
+    def test_validate_requirements_unsatisfied(self) -> None:
+        registry = PluginRegistry()
+        registry.register(
+            PluginInfo(
+                name="dep",
+                description="Depends on todo",
+                required_categories=("todo",),
+            ),
+            [],
+        )
+        errors = registry.validate_category_requirements()
+        assert len(errors) == 1
+        assert "todo" in errors[0]
+        assert "dep" in errors[0]
+
+    def test_validate_multiple_unsatisfied(self) -> None:
+        registry = PluginRegistry()
+        registry.register(
+            PluginInfo(
+                name="multi",
+                description="Needs both",
+                required_categories=("todo", "email"),
+            ),
+            [],
+        )
+        errors = registry.validate_category_requirements()
+        assert len(errors) == 2
+
+    def test_validate_mixed(self) -> None:
+        registry = PluginRegistry()
+        registry.register(
+            PluginInfo(name="rtm", description="RTM", category="todo"), []
+        )
+        registry.register(
+            PluginInfo(
+                name="dep",
+                description="Needs todo and email",
+                required_categories=("todo", "email"),
+            ),
+            [],
+        )
+        errors = registry.validate_category_requirements()
+        assert len(errors) == 1
+        assert "email" in errors[0]
+        assert "todo" not in errors[0]
+
+    def test_empty_category_not_registered(self) -> None:
+        registry = PluginRegistry()
+        registry.register(
+            PluginInfo(name="p1", description="P1", category=""), []
+        )
+        assert registry.plugin_for_category("") is None

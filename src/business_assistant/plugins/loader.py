@@ -27,3 +27,6 @@ def load_plugins(registry: PluginRegistry, plugin_names: list[str]) -> None:
             logger.info("Loaded plugin: %s", name)
         except Exception:
             logger.warning("Failed to load plugin: %s", name, exc_info=True)
+
+    for error in registry.validate_category_requirements():
+        logger.warning(error)
