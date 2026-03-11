@@ -12,6 +12,7 @@ dependencies = [
     "business-assistant-calendar-plugin",
     "business-assistant-rtm-plugin",
     "business-assistant-transcribe-plugin",
+    "business-assistant-obsidian-plugin",
 ]
 
 [build-system]
@@ -27,6 +28,7 @@ business-assistant-imap-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assi
 business-assistant-calendar-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-calendar-plugin", editable = true }
 business-assistant-rtm-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-rtm-plugin", editable = true }
 business-assistant-transcribe-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-transcribe-plugin", editable = true }
+business-assistant-obsidian-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-obsidian-plugin", editable = true }
 
 [project.scripts]
 business-assistant = "business_assistant.main:main"
