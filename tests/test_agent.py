@@ -1,12 +1,14 @@
 """Tests for agent creation and tool wiring."""
 
-from unittest.mock import MagicMock
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 from pydantic_ai import RunContext, Tool
 from pydantic_ai.models.test import TestModel
 
 from business_assistant.agent.agent import _write_feedback, create_agent
 from business_assistant.agent.deps import Deps
+from business_assistant.agent.system_prompt import build_time_prompt
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.registry import PluginInfo, PluginRegistry
 from tests.conftest import make_test_settings
@@ -48,6 +50,31 @@ class TestAgentCreation:
         agent = create_agent(registry, memory, TestModel())
         tool_names = {t.name for t in agent._function_toolset.tools.values()}
         assert "write_feedback" in tool_names
+
+
+class TestBuildTimePrompt:
+    def test_returns_correct_format(self) -> None:
+        fixed_utc = datetime(2026, 3, 11, 15, 5, 0, tzinfo=UTC)
+        with patch(
+            "business_assistant.agent.system_prompt.datetime",
+        ) as mock_dt:
+            mock_dt.now.return_value = fixed_utc
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            result = build_time_prompt("Europe/Berlin")
+
+        assert "2026-03-11 16:05:00 CET" in result
+        assert "(Europe/Berlin)" in result
+
+    def test_summer_time(self) -> None:
+        fixed_utc = datetime(2026, 7, 15, 12, 0, 0, tzinfo=UTC)
+        with patch(
+            "business_assistant.agent.system_prompt.datetime",
+        ) as mock_dt:
+            mock_dt.now.return_value = fixed_utc
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            result = build_time_prompt("Europe/Berlin")
+
+        assert "2026-07-15 14:00:00 CEST" in result
 
 
 class TestWriteFeedback:

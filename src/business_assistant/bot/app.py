@@ -6,7 +6,9 @@ import asyncio
 import contextlib
 import logging
 import os
+from datetime import UTC, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from bot_commander.manager import BotManager
 
@@ -72,6 +74,14 @@ class Application:
         _load_credential_files()
 
         settings = load_settings()
+        utc_now = datetime.now(tz=UTC)
+        local_now = utc_now.astimezone(ZoneInfo(settings.timezone))
+        logger.info(
+            "System clock: utc=%s, local=%s (%s)",
+            utc_now.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            local_now.strftime("%Y-%m-%d %H:%M:%S %Z"),
+            settings.timezone,
+        )
         memory = MemoryStore(settings.memory_file)
 
         plugin_data: dict = {}
