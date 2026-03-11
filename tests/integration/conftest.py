@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
+from business_assistant.config.settings import AppSettings, OpenAISettings, XmppSettings
+
 
 class FakeRawMessage:
     """Minimal stand-in for imap-client-lib raw message headers."""
@@ -44,3 +49,24 @@ class FakeEmailMessage:
         if content_type == "text/html":
             return self._body_html
         return None
+
+
+def make_integration_settings(tmp_path: Path) -> AppSettings:
+    """Create AppSettings for integration tests using real OpenAI keys."""
+    memory_file = str(tmp_path / "memory.json")
+    return AppSettings(
+        xmpp=XmppSettings(
+            jid="bot@example.com",
+            password="secret",
+            default_receiver="user@example.com",
+            allowed_jids=["user@example.com"],
+        ),
+        openai=OpenAISettings(
+            api_key=os.environ["OPENAI_API_KEY"],
+            model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
+        ),
+        memory_file=memory_file,
+        chat_log_file=str(tmp_path / "chat.log"),
+        plugin_names=["business_assistant_imap"],
+        max_conversation_history=100,
+    )

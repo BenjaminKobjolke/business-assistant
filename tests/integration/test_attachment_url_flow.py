@@ -21,11 +21,10 @@ from dotenv import load_dotenv
 
 from business_assistant.agent.agent import create_agent
 from business_assistant.agent.deps import Deps
-from business_assistant.config.settings import AppSettings, OpenAISettings, XmppSettings
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.registry import PluginRegistry
 
-from .conftest import FakeEmailMessage
+from .conftest import FakeEmailMessage, make_integration_settings
 
 # ---------------------------------------------------------------------------
 # Load .env so OPENAI_API_KEY / OPENAI_MODEL are available
@@ -108,25 +107,8 @@ class TestAttachmentUrlFlow:
 
     def test_show_image_calls_get_attachment_url(self, tmp_path: Path) -> None:
         # -- Build real stack --------------------------------------------------
-        memory_file = str(tmp_path / "memory.json")
-        memory = MemoryStore(memory_file)
-
-        settings = AppSettings(
-            xmpp=XmppSettings(
-                jid="bot@example.com",
-                password="secret",
-                default_receiver="user@example.com",
-                allowed_jids=["user@example.com"],
-            ),
-            openai=OpenAISettings(
-                api_key=os.environ["OPENAI_API_KEY"],
-                model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
-            ),
-            memory_file=memory_file,
-            chat_log_file=str(tmp_path / "chat.log"),
-            plugin_names=["business_assistant_imap"],
-            max_conversation_history=100,
-        )
+        settings = make_integration_settings(tmp_path)
+        memory = MemoryStore(settings.memory_file)
 
         mock_client = _build_mock_imap_client()
         mock_ftp = MagicMock()

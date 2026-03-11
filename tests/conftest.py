@@ -22,21 +22,20 @@ def memory_store(tmp_memory_file: str) -> MemoryStore:
     return MemoryStore(tmp_memory_file)
 
 
-@pytest.fixture()
-def mock_settings() -> AppSettings:
-    """Return a mock AppSettings instance."""
+def make_test_settings(
+    chat_log_file: str = "data/chat.log",
+) -> AppSettings:
+    """Create AppSettings for tests with customizable fields."""
     return AppSettings(
         xmpp=XmppSettings(
-            jid="bot@example.com",
-            password="secret",
-            default_receiver="user@example.com",
-            allowed_jids=["user@example.com"],
+            jid="bot@test.com",
+            password="pass",
+            default_receiver="user@test.com",
+            allowed_jids=["user@test.com"],
         ),
-        openai=OpenAISettings(
-            api_key="test-key",
-            model="gpt-4o",
-        ),
+        openai=OpenAISettings(api_key="sk-test", model="gpt-4o"),
         memory_file="data/memory.json",
-        chat_log_file="data/chat.log",
-        plugin_names=["test_plugin"],
+        chat_log_file=chat_log_file,
+        usage_log_file="data/usage.log",
+        plugin_names=[],
     )

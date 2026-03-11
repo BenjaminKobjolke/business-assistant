@@ -7,9 +7,9 @@ from pydantic_ai.models.test import TestModel
 
 from business_assistant.agent.agent import _write_feedback, create_agent
 from business_assistant.agent.deps import Deps
-from business_assistant.config.settings import AppSettings, OpenAISettings, XmppSettings
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.registry import PluginInfo, PluginRegistry
+from tests.conftest import make_test_settings
 
 
 class TestAgentCreation:
@@ -55,19 +55,7 @@ class TestWriteFeedback:
         feedback_dir = tmp_path / "feedback"
         monkeypatch.setenv("FEEDBACK_DIR", str(feedback_dir))
 
-        settings = AppSettings(
-            xmpp=XmppSettings(
-                jid="bot@test.com",
-                password="pass",
-                default_receiver="user@test.com",
-                allowed_jids=["user@test.com"],
-            ),
-            openai=OpenAISettings(api_key="sk-test", model="gpt-4o"),
-            memory_file="data/memory.json",
-            chat_log_file="data/chat.log",
-            usage_log_file="data/usage.log",
-            plugin_names=[],
-        )
+        settings = make_test_settings()
         deps = Deps(
             memory=MemoryStore(str(tmp_path / "mem.json")),
             settings=settings,
