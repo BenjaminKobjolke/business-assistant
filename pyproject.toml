@@ -13,6 +13,7 @@ dependencies = [
     "business-assistant-rtm-plugin",
     "business-assistant-transcribe-plugin",
     "business-assistant-obsidian-plugin",
+    "business-assistant-project-management-plugin",
 ]
 
 [build-system]
@@ -29,6 +30,7 @@ business-assistant-calendar-plugin = { path = "D:/GIT/BenjaminKobjolke/business-
 business-assistant-rtm-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-rtm-plugin", editable = true }
 business-assistant-transcribe-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-transcribe-plugin", editable = true }
 business-assistant-obsidian-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-obsidian-plugin", editable = true }
+business-assistant-project-management-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-project-management-plugin", editable = true }
 
 [project.scripts]
 business-assistant = "business_assistant.main:main"
@@ -52,4 +54,4 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "tools"]

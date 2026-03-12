@@ -367,6 +367,28 @@ dev = [
 ]
 
 [[package]]
+name = "business-assistant-project-management-plugin"
+version = "0.1.0"
+source = { editable = "../business-assistant-project-management-plugin" }
+dependencies = [
+    { name = "business-assistant-v2" },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "business-assistant-v2", editable = "." },
+    { name = "sqlalchemy" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.0.0" },
+    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "ruff", specifier = ">=0.4.0" },
+]
+
+[[package]]
 name = "business-assistant-rtm-plugin"
 version = "0.1.0"
 source = { editable = "../business-assistant-rtm-plugin" }
@@ -419,6 +441,7 @@ dependencies = [
     { name = "business-assistant-calendar-plugin" },
     { name = "business-assistant-imap-plugin" },
     { name = "business-assistant-obsidian-plugin" },
+    { name = "business-assistant-project-management-plugin" },
     { name = "business-assistant-rtm-plugin" },
     { name = "business-assistant-transcribe-plugin" },
     { name = "pydantic-ai" },
@@ -438,6 +461,7 @@ requires-dist = [
     { name = "business-assistant-calendar-plugin", editable = "../business-assistant-calendar-plugin" },
     { name = "business-assistant-imap-plugin", editable = "../business-assistant-imap-plugin" },
     { name = "business-assistant-obsidian-plugin", editable = "../business-assistant-obsidian-plugin" },
+    { name = "business-assistant-project-management-plugin", editable = "../business-assistant-project-management-plugin" },
     { name = "business-assistant-rtm-plugin", editable = "../business-assistant-rtm-plugin" },
     { name = "business-assistant-transcribe-plugin", editable = "../business-assistant-transcribe-plugin" },
     { name = "pydantic-ai" },
@@ -1236,6 +1260,7 @@ requires-dist = [
     { name = "imapclient", specifier = ">=2.3.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "pytest-cov", marker = "extra == 'dev'" },
+    { name = "python-dotenv", marker = "extra == 'dev'" },
 ]
 provides-extras = ["dev"]
 
