@@ -41,8 +41,9 @@ CMD_RESTART = {"restart", "restart chat"}
 RESP_CHAT_CLEARED = "Chat history cleared."
 RESP_RESTART_TRIGGERED = "Restarting... please wait a moment."
 
-# Restart
+# Restart / Shutdown
 RESTART_FLAG_FILE = "restart.flag"
+SHUTDOWN_FLAG_FILE = "shutdown.flag"
 
 # Credential files (auto-generated tokens stored in data/)
 CREDENTIAL_DIR = "data"
@@ -74,8 +75,10 @@ DEFAULT_FTP_PORT = 21
 PLUGIN_DATA_FTP_SERVICE = "ftp_upload"
 
 # Usage tracking
-ENV_USAGE_LOG_FILE = "USAGE_LOG_FILE"
-DEFAULT_USAGE_LOG_FILE = "data/usage.log"
+ENV_USAGE_LOG_DIR = "USAGE_LOG_DIR"
+DEFAULT_USAGE_LOG_DIR = "logs/app/usage"
+USAGE_LOG_PREFIX = "usage"
+USAGE_LOG_SUFFIX = ".jsonl"
 CORE_PLUGIN_NAME = "core"
 
 # Logging environment variables
@@ -87,6 +90,7 @@ ENV_LOG_BACKUP_COUNT = "LOG_BACKUP_COUNT"
 CATEGORY_TODO = "todo"
 CATEGORY_EMAIL = "email"
 CATEGORY_CALENDAR = "calendar"
+CATEGORY_PROJECT_MANAGEMENT = "project_management"
 
 # Logging defaults
 DEFAULT_LOG_LEVEL = "INFO"
@@ -100,6 +104,7 @@ LOG_PLUGIN_FAILED = "Failed to load plugin: {name}"
 LOG_APP_STARTING = "Starting Business Assistant v2"
 LOG_APP_STOPPED = "Business Assistant v2 stopped"
 LOG_APP_RESTARTING = "Restart requested via restart.flag — restarting..."
+LOG_APP_SHUTDOWN_FLAG = "Shutdown requested via shutdown.flag — stopping..."
 LOG_AGENT_ERROR = "Error running AI agent"
 LOG_FILE_DOWNLOADED = "Downloaded file: %s (%d bytes)"
 LOG_FILE_DOWNLOAD_FAILED = "Failed to download file from %s"

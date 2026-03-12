@@ -44,7 +44,7 @@ class TestSettings:
         assert settings.openai.model == "gpt-4o"
         assert settings.memory_file == "data/memory.json"
         assert settings.chat_log_file == "data/chat.log"
-        assert settings.usage_log_file == "data/usage.log"
+        assert settings.usage_log_dir == "logs/app/usage"
         assert settings.plugin_names == []
         assert settings.max_conversation_history == 100
 

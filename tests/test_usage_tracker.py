@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
+from unittest.mock import patch
 
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.usage import RunUsage
@@ -52,8 +54,8 @@ class TestExtractToolNames:
 
 class TestUsageTrackerLog:
     def test_writes_jsonl_entry(self, tmp_path) -> None:
-        log_file = str(tmp_path / "usage.log")
-        tracker = UsageTracker(log_file, {"search_emails": "imap"})
+        log_dir = str(tmp_path / "usage")
+        tracker = UsageTracker(log_dir, {"search_emails": "imap"})
 
         usage = RunUsage(input_tokens=100, output_tokens=50, requests=2, tool_calls=1)
         messages = [
@@ -63,7 +65,10 @@ class TestUsageTrackerLog:
         ]
         tracker.log(usage, messages, "user@test.com", "gpt-4o")
 
-        with open(log_file, encoding="utf-8") as f:
+        files = list((tmp_path / "usage").glob("usage.*.jsonl"))
+        assert len(files) == 1
+
+        with open(files[0], encoding="utf-8") as f:
             entry = json.loads(f.readline())
 
         assert entry["user"] == "user@test.com"
@@ -76,10 +81,23 @@ class TestUsageTrackerLog:
         assert entry["plugins_involved"] == ["imap"]
         assert "ts" in entry
 
+    def test_daily_file_naming(self, tmp_path) -> None:
+        log_dir = str(tmp_path / "usage")
+        tracker = UsageTracker(log_dir, {})
+
+        fixed_time = datetime(2026, 3, 12, 14, 30, 0, tzinfo=UTC)
+        with patch("business_assistant.usage.tracker.datetime") as mock_dt:
+            mock_dt.now.return_value = fixed_time
+            mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+            tracker.log(RunUsage(input_tokens=10), [], "a@test", "gpt-4o")
+
+        expected_file = tmp_path / "usage" / "usage.2026-03-12.jsonl"
+        assert expected_file.exists()
+
     def test_resolves_plugins_from_map(self, tmp_path) -> None:
-        log_file = str(tmp_path / "usage.log")
+        log_dir = str(tmp_path / "usage")
         tool_map = {"search_emails": "imap", "list_events": "calendar"}
-        tracker = UsageTracker(log_file, tool_map)
+        tracker = UsageTracker(log_dir, tool_map)
 
         messages = [
             ModelResponse(parts=[
@@ -89,14 +107,15 @@ class TestUsageTrackerLog:
         ]
         tracker.log(RunUsage(), messages, "user@test.com", "gpt-4o")
 
-        with open(log_file, encoding="utf-8") as f:
+        files = list((tmp_path / "usage").glob("usage.*.jsonl"))
+        with open(files[0], encoding="utf-8") as f:
             entry = json.loads(f.readline())
 
         assert set(entry["plugins_involved"]) == {"imap", "calendar"}
 
     def test_unknown_tool_maps_to_core(self, tmp_path) -> None:
-        log_file = str(tmp_path / "usage.log")
-        tracker = UsageTracker(log_file, {})
+        log_dir = str(tmp_path / "usage")
+        tracker = UsageTracker(log_dir, {})
 
         messages = [
             ModelResponse(parts=[
@@ -105,32 +124,37 @@ class TestUsageTrackerLog:
         ]
         tracker.log(RunUsage(), messages, "user@test.com", "gpt-4o")
 
-        with open(log_file, encoding="utf-8") as f:
+        files = list((tmp_path / "usage").glob("usage.*.jsonl"))
+        with open(files[0], encoding="utf-8") as f:
             entry = json.loads(f.readline())
 
         assert entry["plugins_involved"] == ["core"]
 
     def test_no_tool_calls_empty_lists(self, tmp_path) -> None:
-        log_file = str(tmp_path / "usage.log")
-        tracker = UsageTracker(log_file, {})
+        log_dir = str(tmp_path / "usage")
+        tracker = UsageTracker(log_dir, {})
 
         messages = [ModelResponse(parts=[TextPart(content="hello")])]
         tracker.log(RunUsage(), messages, "user@test.com", "gpt-4o")
 
-        with open(log_file, encoding="utf-8") as f:
+        files = list((tmp_path / "usage").glob("usage.*.jsonl"))
+        with open(files[0], encoding="utf-8") as f:
             entry = json.loads(f.readline())
 
         assert entry["tools_called"] == []
         assert entry["plugins_involved"] == []
 
     def test_multiple_entries_appended(self, tmp_path) -> None:
-        log_file = str(tmp_path / "usage.log")
-        tracker = UsageTracker(log_file, {})
+        log_dir = str(tmp_path / "usage")
+        tracker = UsageTracker(log_dir, {})
 
         tracker.log(RunUsage(input_tokens=10), [], "a@test", "gpt-4o")
         tracker.log(RunUsage(input_tokens=20), [], "b@test", "gpt-4o")
 
-        with open(log_file, encoding="utf-8") as f:
+        files = list((tmp_path / "usage").glob("usage.*.jsonl"))
+        assert len(files) == 1
+
+        with open(files[0], encoding="utf-8") as f:
             lines = f.readlines()
 
         assert len(lines) == 2
@@ -138,8 +162,14 @@ class TestUsageTrackerLog:
         assert json.loads(lines[1])["input_tokens"] == 20
 
     def test_silent_on_write_failure(self, tmp_path) -> None:
+        log_dir = str(tmp_path / "usage")
+        tracker = UsageTracker(log_dir, {})
         # Point to a non-existent deep path that can't be created
-        tracker = UsageTracker("", {})
-        tracker._path = tmp_path / "no" / "such" / "dir" / "usage.log"
+        tracker._log_dir = tmp_path / "no" / "such" / "dir"
         # Should not raise
         tracker.log(RunUsage(), [], "user@test.com", "gpt-4o")
+
+    def test_creates_directory_on_init(self, tmp_path) -> None:
+        log_dir = str(tmp_path / "new" / "usage")
+        UsageTracker(log_dir, {})
+        assert (tmp_path / "new" / "usage").is_dir()

@@ -36,6 +36,6 @@ def make_test_settings(
         openai=OpenAISettings(api_key="sk-test", model="gpt-4o"),
         memory_file="data/memory.json",
         chat_log_file=chat_log_file,
-        usage_log_file="data/usage.log",
+        usage_log_dir="logs/app/usage",
         plugin_names=[],
     )
