@@ -215,5 +215,8 @@ data
 tools/analyze_code_config.bat
 code_analysis_results/
 
+# Usage analyzer price cache
+tools/log_analyze/price_cache.db
+
 # Runtime feedback reports
 feedback/
