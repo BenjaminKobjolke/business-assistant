@@ -45,9 +45,26 @@ SIGINT (Ctrl+C) or SIGTERM cause a clean exit without restart.
 
 **Important:** `restart.flag` only reloads code changes in already-loaded plugins. When activating a new plugin (adding to `PLUGINS` in `.env` or installing a new plugin package), you must fully stop and restart the bot process (Ctrl+C, then `uv run python -m business_assistant.main`).
 
+## Shutting Down the Bot
+
+The bot also supports file-based shutdown via `shutdown.flag`. This causes a clean exit (no restart):
+
+```bash
+touch shutdown.flag
+```
+
+The bot polls for `shutdown.flag` every 5 seconds (checked before `restart.flag`). When detected, it deletes the file and stops the process.
+
 ## Testing After Changes
 
-After implementing features or making significant changes, run tests in this order:
+**Important:** The bot must be stopped before running tests. The bot process locks shared dependencies and will cause `uv run` to hang.
+
+Before testing, shut down the bot:
+```bash
+touch shutdown.flag
+```
+
+Wait a few seconds for the bot to stop, then run tests in this order:
 
 1. **Unit tests** (both repos):
    - `cd business-assistant-imap-plugin && uv run pytest tests/ -v`
@@ -70,6 +87,11 @@ After implementing features or making significant changes, run tests in this ord
      - `D:\GIT\BenjaminKobjolke\business-assistant-rtm-plugin\code_analysis_results\`
 
 Fix any reported issues before committing.
+
+After testing, restart the bot:
+```bash
+powershell -Command "Start-Process 'D:\GIT\BenjaminKobjolke\business-assistant-v2\start_after_tests.bat'"
+```
 
 ## Git Commands
 

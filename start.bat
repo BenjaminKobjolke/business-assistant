@@ -1,4 +1,6 @@
 @echo off
+title Businness Assistant
+
 echo ========================================
 echo  Business Assistant v2 - Starting
 echo ========================================
