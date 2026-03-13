@@ -98,7 +98,15 @@ class Application:
         agent = create_agent(registry, memory, model_name, timezone=settings.timezone)
 
         tool_plugin_map = registry.tool_plugin_map()
-        for name in ("memory_get", "memory_set", "memory_delete", "memory_list", "write_feedback"):
+        for name in (
+            "memory_get",
+            "memory_set",
+            "memory_delete",
+            "memory_list",
+            "write_feedback",
+            "list_pending_retries",
+            "complete_retry",
+        ):
             tool_plugin_map[name] = CORE_PLUGIN_NAME
         usage_tracker = UsageTracker(settings.usage_log_dir, tool_plugin_map)
         downloader = FileDownloader(settings.upload_dir)

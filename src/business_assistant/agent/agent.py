@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -11,7 +12,13 @@ from typing import Any
 
 from pydantic_ai import Agent, RunContext, Tool
 
-from business_assistant.config.constants import DEFAULT_FEEDBACK_DIR, ENV_FEEDBACK_DIR
+from business_assistant.config.constants import (
+    DEFAULT_FEEDBACK_DIR,
+    DEFAULT_PENDING_RETRIES_SUBDIR,
+    ENV_FEEDBACK_DIR,
+    RETRY_STATUS_COMPLETED,
+    RETRY_STATUS_PENDING,
+)
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.registry import PluginRegistry
 
@@ -65,7 +72,9 @@ def _resolve_feedback_dir() -> Path:
 _SAFE_FILENAME_RE = re.compile(r"[^\w\-]")
 
 
-def _write_feedback(ctx: RunContext[Deps], title: str, content: str) -> str:
+def _write_feedback(
+    ctx: RunContext[Deps], title: str, content: str, intended_action: str = ""
+) -> str:
     """Write a diagnostic feedback report about a tool problem for the developer."""
     feedback_dir = _resolve_feedback_dir()
     feedback_dir.mkdir(parents=True, exist_ok=True)
@@ -82,7 +91,83 @@ def _write_feedback(ctx: RunContext[Deps], title: str, content: str) -> str:
     filepath = feedback_dir / filename
     filepath.write_text(report, encoding="utf-8")
     logger.info("Feedback written to %s", filepath)
-    return f"Feedback saved: {filename}"
+
+    result_msg = f"Feedback saved: {filename}"
+
+    if intended_action:
+        retry_dir = feedback_dir / DEFAULT_PENDING_RETRIES_SUBDIR
+        retry_dir.mkdir(parents=True, exist_ok=True)
+
+        retry_id = f"{ts}_{safe_title}"
+        retry_data = {
+            "id": retry_id,
+            "created_at": datetime.now(tz=UTC).isoformat(),
+            "user_id": ctx.deps.user_id,
+            "status": RETRY_STATUS_PENDING,
+            "user_request": content,
+            "intended_action": intended_action,
+            "feedback_file": filename,
+            "completed_at": None,
+        }
+        retry_file = retry_dir / f"{retry_id}.json"
+        retry_file.write_text(json.dumps(retry_data, indent=2), encoding="utf-8")
+        logger.info("Pending retry saved: %s", retry_file)
+        result_msg += f" Pending retry created: {retry_id}"
+
+    return result_msg
+
+
+def _list_pending_retries(ctx: RunContext[Deps]) -> str:
+    """List all pending retry actions that have not been completed yet."""
+    feedback_dir = _resolve_feedback_dir()
+    retry_dir = feedback_dir / DEFAULT_PENDING_RETRIES_SUBDIR
+
+    if not retry_dir.is_dir():
+        return "No pending retries found."
+
+    pending: list[dict[str, Any]] = []
+    for json_file in sorted(retry_dir.glob("*.json")):
+        try:
+            data = json.loads(json_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if data.get("status") == RETRY_STATUS_PENDING:
+            pending.append(data)
+
+    if not pending:
+        return "No pending retries found."
+
+    lines = []
+    for item in pending:
+        lines.append(
+            f"- **{item['id']}**: {item.get('user_request', 'N/A')}\n"
+            f"  Action needed: {item.get('intended_action', 'N/A')}"
+        )
+    return f"Pending retries ({len(pending)}):\n" + "\n".join(lines)
+
+
+def _complete_retry(ctx: RunContext[Deps], retry_id: str) -> str:
+    """Mark a pending retry as completed after successfully executing the action."""
+    feedback_dir = _resolve_feedback_dir()
+    retry_dir = feedback_dir / DEFAULT_PENDING_RETRIES_SUBDIR
+    retry_file = retry_dir / f"{retry_id}.json"
+
+    if not retry_file.is_file():
+        return f"Retry not found: {retry_id}"
+
+    try:
+        data = json.loads(retry_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return f"Error reading retry file: {retry_id}"
+
+    if data.get("status") == RETRY_STATUS_COMPLETED:
+        return f"Retry already completed: {retry_id}"
+
+    data["status"] = RETRY_STATUS_COMPLETED
+    data["completed_at"] = datetime.now(tz=UTC).isoformat()
+    retry_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    logger.info("Retry completed: %s", retry_id)
+    return f"Retry completed: {retry_id}"
 
 
 def create_agent(
@@ -115,7 +200,24 @@ def create_agent(
         Tool(
             _write_feedback,
             name="write_feedback",
-            description="Write a diagnostic feedback report about a tool problem.",
+            description=(
+                "Write a diagnostic feedback report about a tool problem. "
+                "Use the intended_action parameter to save a pending retry "
+                "when a user request cannot be fulfilled."
+            ),
+        ),
+        Tool(
+            _list_pending_retries,
+            name="list_pending_retries",
+            description="List all pending retry actions that have not been completed yet.",
+        ),
+        Tool(
+            _complete_retry,
+            name="complete_retry",
+            description=(
+                "Mark a pending retry as completed after successfully "
+                "executing the action."
+            ),
         ),
     ]
 

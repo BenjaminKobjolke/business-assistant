@@ -54,6 +54,11 @@ ENV_RTM_TOKEN = "RTM_TOKEN"
 DEFAULT_FEEDBACK_DIR = "feedback"
 ENV_FEEDBACK_DIR = "FEEDBACK_DIR"
 
+# Pending retries
+DEFAULT_PENDING_RETRIES_SUBDIR = "pending_retries"
+RETRY_STATUS_PENDING = "pending"
+RETRY_STATUS_COMPLETED = "completed"
+
 # File uploads
 DEFAULT_UPLOAD_DIR = "data/uploads"
 ENV_UPLOAD_DIR = "UPLOAD_DIR"
@@ -121,6 +126,13 @@ information before performing searches.
 If you encounter a problem with a tool (e.g. a function returns an error, unexpected behavior, \
 or you cannot fulfill a request due to tool limitations), use the write_feedback tool to document \
 the issue for the developer. Include what you tried, what happened, and what you expected.
+
+When you cannot fulfill a user request due to a missing tool or capability, use write_feedback \
+with the intended_action parameter to save a pending retry. Describe the user's original request \
+in the content and what tool or action would be needed in intended_action. \
+Periodically (or when a user asks), check list_pending_retries to see if any previously failed \
+actions can now be fulfilled with your current tools. If you can complete a pending retry, \
+execute the action and then call complete_retry with the retry ID.
 
 Current memory contents:
 {memory_contents}
