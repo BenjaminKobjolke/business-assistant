@@ -255,10 +255,26 @@ SYSTEM_PROMPT = """You have access to my_plugin tools: ..."""
 
 ## Activation
 
-Add the plugin module name to `PLUGINS` in `.env`:
+1. Add the plugin package to `business-assistant-v2/pyproject.toml`:
 
-```
-PLUGINS=business_assistant_rtm,business_assistant_imap,business_assistant_my
-```
+   In `dependencies`:
+   ```toml
+   dependencies = [
+       # ... existing deps ...
+       "business-assistant-my-plugin",
+   ]
+   ```
 
-After adding a new plugin, fully restart the bot process (Ctrl+C, then `uv run python -m business_assistant.main`). The `restart.flag` mechanism only reloads existing plugins.
+   In `[tool.uv.sources]`:
+   ```toml
+   business-assistant-my-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-my-plugin", editable = true }
+   ```
+
+2. Run `uv sync` in `business-assistant-v2/` to install the package.
+
+3. Add the plugin module name to `PLUGINS` in `.env`:
+   ```
+   PLUGINS=business_assistant_rtm,business_assistant_imap,business_assistant_my
+   ```
+
+4. Fully restart the bot process (Ctrl+C, then `uv run python -m business_assistant.main`). The `restart.flag` mechanism only reloads existing plugins.
