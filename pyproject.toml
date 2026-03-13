@@ -15,6 +15,7 @@ dependencies = [
     "business-assistant-obsidian-plugin",
     "business-assistant-project-management-plugin",
     "business-assistant-filesystem-plugin",
+    "business-assistant-workingtimes-plugin",
 ]
 
 [build-system]
@@ -33,6 +34,7 @@ business-assistant-transcribe-plugin = { path = "D:/GIT/BenjaminKobjolke/busines
 business-assistant-obsidian-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-obsidian-plugin", editable = true }
 business-assistant-project-management-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-project-management-plugin", editable = true }
 business-assistant-filesystem-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-filesystem-plugin", editable = true }
+business-assistant-workingtimes-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-workingtimes-plugin", editable = true }
 
 [project.scripts]
 business-assistant = "business_assistant.main:main"
