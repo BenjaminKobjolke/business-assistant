@@ -6,9 +6,10 @@ import json
 import logging
 import os
 import re
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from pydantic_ai import Agent, RunContext, Tool
 
@@ -79,7 +80,8 @@ def _write_feedback(
     feedback_dir = _resolve_feedback_dir()
     feedback_dir.mkdir(parents=True, exist_ok=True)
 
-    ts = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H-%M-%S")
+    tz = ZoneInfo(ctx.deps.settings.timezone)
+    ts = datetime.now(tz=tz).strftime("%Y-%m-%d_%H-%M-%S")
     safe_title = _SAFE_FILENAME_RE.sub("_", title)[:60]
     filename = f"{ts}_{safe_title}.md"
 
@@ -101,7 +103,7 @@ def _write_feedback(
         retry_id = f"{ts}_{safe_title}"
         retry_data = {
             "id": retry_id,
-            "created_at": datetime.now(tz=UTC).isoformat(),
+            "created_at": datetime.now(tz=tz).isoformat(),
             "user_id": ctx.deps.user_id,
             "status": RETRY_STATUS_PENDING,
             "user_request": content,
@@ -164,7 +166,8 @@ def _complete_retry(ctx: RunContext[Deps], retry_id: str) -> str:
         return f"Retry already completed: {retry_id}"
 
     data["status"] = RETRY_STATUS_COMPLETED
-    data["completed_at"] = datetime.now(tz=UTC).isoformat()
+    tz = ZoneInfo(ctx.deps.settings.timezone)
+    data["completed_at"] = datetime.now(tz=tz).isoformat()
     retry_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
     logger.info("Retry completed: %s", retry_id)
     return f"Retry completed: {retry_id}"
