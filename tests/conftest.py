@@ -24,6 +24,7 @@ def memory_store(tmp_memory_file: str) -> MemoryStore:
 
 def make_test_settings(
     chat_log_file: str = "data/chat.log",
+    chat_log_dir: str = "logs/chat",
 ) -> AppSettings:
     """Create AppSettings for tests with customizable fields."""
     return AppSettings(
@@ -36,6 +37,7 @@ def make_test_settings(
         openai=OpenAISettings(api_key="sk-test", model="gpt-4o"),
         memory_file="data/memory.json",
         chat_log_file=chat_log_file,
+        chat_log_dir=chat_log_dir,
         usage_log_dir="logs/app/usage",
         plugin_names=[],
     )

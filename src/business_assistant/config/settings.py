@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from dotenv import load_dotenv
 
 from .constants import (
+    DEFAULT_CHAT_LOG_DIR,
     DEFAULT_CHAT_LOG_FILE,
     DEFAULT_FTP_PORT,
     DEFAULT_MAX_CONVERSATION_HISTORY,
@@ -17,6 +18,7 @@ from .constants import (
     DEFAULT_UPLOAD_DIR,
     DEFAULT_USAGE_LOG_DIR,
     DEFAULT_USER_TIMEZONE,
+    ENV_CHAT_LOG_DIR,
     ENV_CHAT_LOG_FILE,
     ENV_FTP_BASE_PATH,
     ENV_FTP_BASE_URL,
@@ -81,6 +83,7 @@ class AppSettings:
     openai: OpenAISettings
     memory_file: str
     chat_log_file: str
+    chat_log_dir: str
     usage_log_dir: str
     plugin_names: list[str]
     timezone: str = DEFAULT_USER_TIMEZONE
@@ -134,6 +137,7 @@ def load_settings() -> AppSettings:
         openai=openai,
         memory_file=os.environ.get(ENV_MEMORY_FILE, DEFAULT_MEMORY_FILE),
         chat_log_file=os.environ.get(ENV_CHAT_LOG_FILE, DEFAULT_CHAT_LOG_FILE),
+        chat_log_dir=os.environ.get(ENV_CHAT_LOG_DIR, DEFAULT_CHAT_LOG_DIR),
         usage_log_dir=os.environ.get(ENV_USAGE_LOG_DIR, DEFAULT_USAGE_LOG_DIR),
         timezone=os.environ.get(ENV_USER_TIMEZONE, DEFAULT_USER_TIMEZONE),
         upload_dir=os.environ.get(ENV_UPLOAD_DIR, DEFAULT_UPLOAD_DIR),

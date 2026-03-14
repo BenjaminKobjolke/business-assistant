@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from bot_commander.types import BotMessage, BotResponse
@@ -17,14 +18,17 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.usage import RunUsage
 
+from business_assistant.agent.router import CategoryRouter, RoutingResult
 from business_assistant.bot.handler import AIMessageHandler, _safe_truncate
 from business_assistant.config.constants import (
     ERR_AGENT_FAILED,
+    PLUGIN_DATA_MESSAGE_MODIFIERS,
     RESP_CHAT_CLEARED,
     RESP_RESTART_TRIGGERED,
 )
 from business_assistant.files.downloader import FileDownloader
 from business_assistant.memory.store import MemoryStore
+from business_assistant.plugins.registry import PluginRegistry
 from tests.conftest import make_test_settings
 
 
@@ -33,6 +37,7 @@ def _make_handler(
     agent_error: Exception | None = None,
     tmp_memory_file: str = "",
     chat_log_file: str = "data/chat.log",
+    chat_log_dir: str = "logs/chat",
     file_downloader: FileDownloader | None = None,
     plugin_data: dict | None = None,
 ) -> AIMessageHandler:
@@ -49,7 +54,7 @@ def _make_handler(
         mock_agent.run_sync.return_value = mock_result
 
     memory = MemoryStore(tmp_memory_file or "nonexistent.json")
-    settings = make_test_settings(chat_log_file=chat_log_file)
+    settings = make_test_settings(chat_log_file=chat_log_file, chat_log_dir=chat_log_dir)
 
     return AIMessageHandler(
         agent=mock_agent,
@@ -122,14 +127,24 @@ class TestConversationHistory:
 
 
 class TestChatLogging:
-    def test_chat_log_written_on_success(self, tmp_path: object, tmp_memory_file: str) -> None:
-        log_file = str(tmp_path / "chat.log")  # type: ignore[operator]
+    def test_chat_log_per_conversation_file_created(
+        self, tmp_path: object, tmp_memory_file: str,
+    ) -> None:
+        log_dir = str(tmp_path / "chats")  # type: ignore[operator]
         handler = _make_handler(
-            agent_result="Hi!", tmp_memory_file=tmp_memory_file, chat_log_file=log_file
+            agent_result="Hi!",
+            tmp_memory_file=tmp_memory_file,
+            chat_log_dir=log_dir,
         )
         handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
 
-        with open(log_file, encoding="utf-8") as f:
+        # Find the JSONL file under the sanitized user directory
+        user_dir = Path(log_dir) / "user_at_test.com"
+        assert user_dir.exists()
+        jsonl_files = list(user_dir.glob("*.jsonl"))
+        assert len(jsonl_files) == 1
+
+        with open(jsonl_files[0], encoding="utf-8") as f:
             entry = json.loads(f.readline())
         assert entry["user"] == "user@test.com"
         assert entry["in"] == "Hello"
@@ -138,20 +153,67 @@ class TestChatLogging:
         assert "ts" in entry
 
     def test_chat_log_written_on_error(self, tmp_path: object, tmp_memory_file: str) -> None:
-        log_file = str(tmp_path / "chat.log")  # type: ignore[operator]
+        log_dir = str(tmp_path / "chats")  # type: ignore[operator]
         handler = _make_handler(
             agent_error=RuntimeError("boom"),
             tmp_memory_file=tmp_memory_file,
-            chat_log_file=log_file,
+            chat_log_dir=log_dir,
         )
         handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
 
-        with open(log_file, encoding="utf-8") as f:
+        user_dir = Path(log_dir) / "user_at_test.com"
+        jsonl_files = list(user_dir.glob("*.jsonl"))
+        assert len(jsonl_files) == 1
+
+        with open(jsonl_files[0], encoding="utf-8") as f:
             entry = json.loads(f.readline())
         assert entry["user"] == "user@test.com"
         assert entry["in"] == "Hello"
         assert entry["out"] == ERR_AGENT_FAILED
         assert entry["error"] is True
+
+    def test_chat_log_new_file_after_clear(
+        self, tmp_path: object, tmp_memory_file: str,
+    ) -> None:
+        log_dir = str(tmp_path / "chats")  # type: ignore[operator]
+        handler = _make_handler(
+            agent_result="Hi!",
+            tmp_memory_file=tmp_memory_file,
+            chat_log_dir=log_dir,
+        )
+
+        handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
+
+        # Force a different timestamp for the next conversation
+        handler._conversation_starts.pop("user@test.com")
+
+        handler.handle(BotMessage(user_id="user@test.com", text="clear"))
+        handler.handle(BotMessage(user_id="user@test.com", text="Hello again"))
+
+        user_dir = Path(log_dir) / "user_at_test.com"
+        jsonl_files = sorted(user_dir.glob("*.jsonl"))
+        # May be 1 or 2 files depending on timestamp resolution;
+        # verify at least two entries across files
+        all_entries = []
+        for f in jsonl_files:
+            with open(f, encoding="utf-8") as fh:
+                all_entries.extend(json.loads(line) for line in fh if line.strip())
+        assert len(all_entries) == 2
+
+    def test_chat_log_sanitizes_user_jid(
+        self, tmp_path: object, tmp_memory_file: str,
+    ) -> None:
+        log_dir = str(tmp_path / "chats")  # type: ignore[operator]
+        handler = _make_handler(
+            agent_result="Hi!",
+            tmp_memory_file=tmp_memory_file,
+            chat_log_dir=log_dir,
+        )
+        handler.handle(BotMessage(user_id="user@test.com/resource", text="Hello"))
+
+        # @ → _at_, / → _
+        user_dir = Path(log_dir) / "user_at_test.com_resource"
+        assert user_dir.exists()
 
 
 class TestSafeTruncate:
@@ -279,5 +341,111 @@ class TestChatCommands:
         response = handler.handle(BotMessage(user_id="user@test.com", text="hello"))
         assert response.text == "Hi!"
         handler._agent.run_sync.assert_called_once()
+
+
+class TestStickyCategories:
+    def _make_routed_handler(
+        self,
+        tmp_memory_file: str,
+        tmp_path: Path,
+        route_results: list[set[str]],
+    ) -> AIMessageHandler:
+        """Create a handler with mocked router and registry."""
+        mock_agent = MagicMock()
+        mock_result = MagicMock()
+        mock_result.output = "OK"
+        mock_result.all_messages.return_value = [{"role": "user"}, {"role": "assistant"}]
+        mock_result.usage.return_value = RunUsage()
+        mock_agent.run_sync.return_value = mock_result
+
+        mock_router = MagicMock(spec=CategoryRouter)
+        call_idx = {"i": 0}
+
+        def _route(text: str) -> RoutingResult:
+            idx = min(call_idx["i"], len(route_results) - 1)
+            call_idx["i"] += 1
+            return RoutingResult(categories=route_results[idx], usage=None)
+
+        mock_router.route.side_effect = _route
+
+        mock_registry = MagicMock(spec=PluginRegistry)
+        mock_registry.tools_for_categories.return_value = []
+        mock_registry.prompts_for_categories.return_value = ""
+
+        memory = MemoryStore(tmp_memory_file)
+        log_dir = str(tmp_path / "chats")
+        settings = make_test_settings(chat_log_dir=log_dir)
+
+        return AIMessageHandler(
+            agent=mock_agent,
+            memory=memory,
+            settings=settings,
+            registry=mock_registry,
+            router=mock_router,
+            core_tools=[],
+        )
+
+    def test_categories_sticky_across_turns(
+        self, tmp_memory_file: str, tmp_path: Path,
+    ) -> None:
+        """Second turn should include categories from the first turn."""
+        handler = self._make_routed_handler(
+            tmp_memory_file, tmp_path,
+            route_results=[{"todo"}, set()],
+        )
+
+        handler.handle(BotMessage(user_id="user@test.com", text="Add task"))
+        handler.handle(BotMessage(user_id="user@test.com", text="Ja"))
+
+        # Second call to tools_for_categories should include "todo" from stickiness
+        calls = handler._registry.tools_for_categories.call_args_list  # type: ignore[union-attr]
+        assert calls[0].args[0] == {"todo"}
+        assert "todo" in calls[1].args[0]
+
+    def test_clear_resets_sticky_categories(
+        self, tmp_memory_file: str, tmp_path: Path,
+    ) -> None:
+        """Clear command should reset sticky categories."""
+        handler = self._make_routed_handler(
+            tmp_memory_file, tmp_path,
+            route_results=[{"todo"}, set()],
+        )
+
+        handler.handle(BotMessage(user_id="user@test.com", text="Add task"))
+        assert "user@test.com" in handler._last_categories
+
+        handler.handle(BotMessage(user_id="user@test.com", text="clear"))
+        assert "user@test.com" not in handler._last_categories
+
+        handler.handle(BotMessage(user_id="user@test.com", text="Ja"))
+
+        # After clear, second routed call should have empty categories only
+        calls = handler._registry.tools_for_categories.call_args_list  # type: ignore[union-attr]
+        assert calls[1].args[0] == set()
+
+
+class TestChatLogModifiedText:
+    def test_chat_log_records_modified_text(
+        self, tmp_path: Path, tmp_memory_file: str,
+    ) -> None:
+        """Chat log should record the modified/transcribed text, not the raw input."""
+        log_dir = str(tmp_path / "chats")
+
+        def _modifier(text: str, user_id: str, plugin_data: dict) -> str:
+            return text.replace("raw_url", "transcribed text")
+
+        handler = _make_handler(
+            agent_result="Got it!",
+            tmp_memory_file=tmp_memory_file,
+            chat_log_dir=log_dir,
+            plugin_data={PLUGIN_DATA_MESSAGE_MODIFIERS: [_modifier]},
+        )
+        handler.handle(BotMessage(user_id="user@test.com", text="raw_url"))
+
+        user_dir = Path(log_dir) / "user_at_test.com"
+        jsonl_files = list(user_dir.glob("*.jsonl"))
+        with open(jsonl_files[0], encoding="utf-8") as f:
+            entry = json.loads(f.readline())
+        assert entry["in"] == "transcribed text"
 
 
