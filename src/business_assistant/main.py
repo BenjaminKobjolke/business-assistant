@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import atexit
 import logging
 import signal
+import sys
 import threading
 from pathlib import Path
 
@@ -11,10 +13,12 @@ from business_assistant.bot.app import Application
 from business_assistant.config.constants import (
     LOG_APP_RESTARTING,
     LOG_APP_SHUTDOWN_FLAG,
+    PID_LOCK_FILE,
     RESTART_FLAG_FILE,
     SHUTDOWN_FLAG_FILE,
 )
 from business_assistant.config.log_setup import setup_logging
+from business_assistant.config.pidlock import PidLock, PidLockError
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +66,25 @@ def main() -> None:
     """
     setup_logging()
 
+    pid_lock = PidLock(Path(PID_LOCK_FILE))
+    try:
+        pid_lock.acquire()
+    except PidLockError as exc:
+        logger.error(str(exc))
+        sys.exit(1)
+    atexit.register(pid_lock.release)
+
     restart_flag = Path(RESTART_FLAG_FILE)
     shutdown_flag = Path(SHUTDOWN_FLAG_FILE)
 
+    try:
+        _run_loop(restart_flag, shutdown_flag)
+    finally:
+        pid_lock.release()
+
+
+def _run_loop(restart_flag: Path, shutdown_flag: Path) -> None:
+    """Run the main restart loop."""
     while True:
         app = Application()
         stop_event = threading.Event()

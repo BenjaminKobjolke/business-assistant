@@ -23,6 +23,10 @@ DEFAULT_ROUTER_MODEL = "gpt-5-mini"
 DEFAULT_USER_TIMEZONE = "Europe/Berlin"
 DEFAULT_MEMORY_FILE = "data/memory.json"
 DEFAULT_CHAT_LOG_FILE = "data/chat.log"
+DEFAULT_CHAT_LOG_DIR = "logs/chat"
+ENV_CHAT_LOG_DIR = "CHAT_LOG_DIR"
+LOG_TOOLS_SELECTED = "Tools for user=%s categories=%s: %s"
+LOG_STICKY_CATEGORIES = "Sticky categories for user=%s: %s"
 DEFAULT_MAX_CONVERSATION_HISTORY = 100
 
 # Bot config keys (used by BotConfigProvider)
@@ -49,6 +53,17 @@ RESP_RESTART_TRIGGERED = "Restarting... please wait a moment."
 # Restart / Shutdown
 RESTART_FLAG_FILE = "restart.flag"
 SHUTDOWN_FLAG_FILE = "shutdown.flag"
+PID_LOCK_FILE = "bot.pid"
+
+# PID lock log messages
+LOG_PID_SHUTTING_DOWN_OLD = "Shutting down existing instance (PID %d)..."
+LOG_PID_OLD_STOPPED = "Previous instance stopped"
+LOG_PID_STALE = "Stale PID file found (PID %d no longer running), overwriting"
+LOG_PID_LOCK_ACQUIRED = "PID lock acquired (PID %d)"
+LOG_PID_LOCK_RELEASED = "PID lock released"
+ERR_PID_SHUTDOWN_TIMEOUT = (
+    "ERROR: Previous instance (PID {pid}) did not stop within {timeout}s. Kill it manually."
+)
 
 # Credential files (auto-generated tokens stored in data/)
 CREDENTIAL_DIR = "data"
