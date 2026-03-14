@@ -97,6 +97,14 @@ powershell -Command "Start-Process 'D:\GIT\BenjaminKobjolke\business-assistant-v
 
 Never use compound commands (`cd /path && git ...`) with git. Run all git commands directly without `cd` prefixes. If you need to operate on a different repo, use separate commands.
 
+## XMPP Event Loop Constraint
+
+`handle()` in `bot/handler.py` is called from the XMPP async event loop. **Never call `run_sync()` or any other blocking async operation directly inside `handle()`.** This includes PydanticAI agent calls, HTTP requests, or any code that creates/runs an event loop.
+
+All such calls must go through `self._executor.submit()` (ThreadPoolExecutor) to run in a separate thread. The main agent call and the category router call both run inside `_run_agent()` for this reason.
+
+Symptom if violated: `RuntimeError: This event loop is already running`.
+
 ## Rules
 
 ### Common Rules

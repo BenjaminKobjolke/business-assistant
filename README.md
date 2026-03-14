@@ -5,11 +5,42 @@ Plugin-based XMPP chatbot using PydanticAI for natural language understanding an
 ## Architecture
 
 ```
-User (XMPP) --> bot-commander (XmppAdapter) --> AIMessageHandler.handle()
-  --> ThreadPoolExecutor --> PydanticAI agent.run_sync()
-    --> agent calls tools (email, memory, etc.)
-  --> BotResponse(text) --> XMPP reply
+User (XMPP)
+  |
+  v
+bot-commander (XmppAdapter)
+  |
+  v
+AIMessageHandler.handle()
+  |
+  +-- Built-in commands (clear, restart)
+  +-- Plugin command handlers (short-circuit before AI)
+  +-- Message modifiers (transform text before AI)
+  |
+  v
+Category Router (gpt-5-mini)          <-- Call 1: select plugin categories
+  |
+  v
+PydanticAI agent.run_sync()           <-- Call 2: process with selected tools
+  (via agent.override(tools=...))
+  |
+  v
+Response processors (transform response)
+  |
+  v
+BotResponse --> XMPP reply
 ```
+
+### Dynamic Tool Loading
+
+OpenAI limits function tools to 128 per API call. Instead of sending all tools with every request, the bot uses a **two-phase approach**:
+
+1. A lightweight router model (`ROUTER_MODEL`, default `gpt-5-mini`) reads the user's message and selects which plugin categories are needed
+2. Only the selected categories' tools are loaded for the main model via `agent.override()`
+
+This reduces per-request tool count from ~100 to ~15-40 depending on the message, while allowing unlimited total tools across all plugins.
+
+See [docs/TOOL_LIMIT.md](docs/TOOL_LIMIT.md) for details.
 
 ## Setup
 
@@ -26,46 +57,43 @@ Send messages via XMPP to interact with the assistant.
 
 ## Plugins
 
-Plugins are separate packages discovered via the `PLUGINS` environment variable (comma-separated Python module names).
+Plugins are separate packages discovered via the `PLUGINS` environment variable (comma-separated Python module names). Each plugin registers tools, system prompt additions, and optional hooks with a central `PluginRegistry`.
 
-### Adding a Plugin
-
-1. Create a Python package with a top-level `register(registry)` function
-2. The function receives a `PluginRegistry` and registers PydanticAI tools
-3. Add the module name to `PLUGINS` in `.env`
-4. Install the plugin package as an editable dependency
+See [docs/plugins/plugin-development-guide.md](docs/plugins/plugin-development-guide.md) for creating new plugins.
 
 ### Available Plugins
 
-- **business-assistant-imap-plugin** (`business_assistant_imap`): IMAP/SMTP email operations
-- **business-assistant-calendar-plugin** (`business_assistant_calendar`): Google Calendar operations
+| Plugin | Module | Description |
+|--------|--------|-------------|
+| IMAP | `business_assistant_imap` | Email operations (read, send, reply, forward, search, tags) |
+| Calendar | `business_assistant_calendar` | Google Calendar (events, scheduling, ICS import) |
+| RTM | `business_assistant_rtm` | Remember The Milk task management |
+| Obsidian | `business_assistant_obsidian` | Obsidian vault note management |
+| Project Management | `business_assistant_pm` | Project orchestration (links email/tasks/notes/files) |
+| Filesystem | `business_assistant_filesystem` | File operations (read, write, copy, move) |
+| Workingtimes | `business_assistant_workingtimes` | Time tracking (log hours, manage entries) |
+| Transcribe | `business_assistant_transcribe` | Audio transcription via Whisper |
+| TTS | `business_assistant_tts` | Text-to-speech (uses hooks, no AI tools) |
 
 ### Plugin Configuration
 
-Only plugins listed in the `PLUGINS` environment variable are loaded. Set it in `.env` as a comma-separated list of Python module names:
+Only plugins listed in `PLUGINS` are loaded. Set it in `.env` as a comma-separated list:
 
 ```bash
-# Both plugins
-PLUGINS=business_assistant_imap,business_assistant_calendar
-
-# IMAP only
-PLUGINS=business_assistant_imap
-
-# Calendar only
-PLUGINS=business_assistant_calendar
-
-# No plugins
-PLUGINS=
+PLUGINS=business_assistant_imap,business_assistant_calendar,business_assistant_rtm
 ```
 
-Each plugin also requires its own environment variables to function. If the required variable is missing, the plugin skips registration gracefully.
+Each plugin requires its own environment variables. If the required variable is missing, the plugin skips registration gracefully. See `.env.example` for all available settings.
 
-| Plugin | Required env var | Additional env vars |
-|--------|-----------------|-------------------|
-| `business_assistant_imap` | `IMAP_SERVER` | `IMAP_USERNAME`, `IMAP_PASSWORD`, `SMTP_SERVER`, etc. |
-| `business_assistant_calendar` | `GOOGLE_CALENDAR_CREDENTIALS_PATH` | `GOOGLE_CALENDAR_TOKEN_PATH`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_TIMEZONE`, `GOOGLE_CALENDAR_FREE_CHECK_IDS` |
+### Plugin Hooks
 
-See `.env.example` for all available settings.
+Plugins can register hooks that run without consuming AI tool slots:
+
+- **Command handlers**: Intercept messages before the AI (short-circuit with a direct response)
+- **Message modifiers**: Transform message text before the AI processes it
+- **Response processors**: Transform responses after the AI produces them
+
+See [docs/COMMAND_HANDLER.md](docs/COMMAND_HANDLER.md) for details.
 
 ## Memory System
 
@@ -75,14 +103,53 @@ The built-in memory system stores user preferences as key-value pairs in a JSON 
 - "Forget Markus"
 - "What do you remember?"
 
+## File Handling
+
+Plugins can register file handlers for specific MIME types. When a user sends a file attachment via XMPP, the bot downloads it and routes it to the appropriate handler. See [docs/plugins/features/FILE_UPLOAD.md](docs/plugins/features/FILE_UPLOAD.md).
+
+## Restart and Shutdown
+
+The bot supports file-based lifecycle control:
+
+- `touch restart.flag` — hot-reload plugins and agent (polled every 5s)
+- `touch shutdown.flag` — clean shutdown without restart
+- Ctrl+C / SIGTERM — clean exit
+
+## Configuration
+
+Key environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | (required) | OpenAI API key |
+| `OPENAI_MODEL` | `gpt-4o` | Main model for processing requests |
+| `ROUTER_MODEL` | `gpt-5-mini` | Lightweight model for category routing |
+| `PLUGINS` | (empty) | Comma-separated plugin module names |
+| `XMPP_JID` | (required) | Bot's XMPP JID |
+| `XMPP_PASSWORD` | (required) | Bot's XMPP password |
+| `XMPP_DEFAULT_RECEIVER` | (required) | Default recipient JID |
+| `MEMORY_FILE` | `data/memory.json` | Path to memory store |
+| `USER_TIMEZONE` | `Europe/Berlin` | IANA timezone for time display |
+
+See `.env.example` for the complete list.
+
 ## Development
 
 ```bash
-# Run tests
-tools\tests.bat
+# Install dependencies
+uv sync --all-extras
 
-# Update dependencies and run checks
-update.bat
+# Run unit tests
+uv run pytest tests/ -v --ignore=tests/integration
+
+# Run integration tests (requires OPENAI_API_KEY)
+uv run pytest tests/integration/ -v
+
+# Lint
+uv run ruff check src/ tests/
+
+# Type check
+uv run mypy src/
 ```
 
 ## Dependencies
