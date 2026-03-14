@@ -64,6 +64,15 @@ DEFAULT_UPLOAD_DIR = "data/uploads"
 ENV_UPLOAD_DIR = "UPLOAD_DIR"
 PLUGIN_DATA_FILE_HANDLERS = "file_handlers"
 
+# Response processors
+PLUGIN_DATA_RESPONSE_PROCESSORS = "response_processors"
+
+# Command handlers (plugin-registered, run before AI)
+PLUGIN_DATA_COMMAND_HANDLERS = "command_handlers"
+
+# Message modifiers (modify text before AI processes it)
+PLUGIN_DATA_MESSAGE_MODIFIERS = "message_modifiers"
+
 # FTP environment variables
 ENV_FTP_HOST = "FTP_HOST"
 ENV_FTP_USERNAME = "FTP_USERNAME"

@@ -19,7 +19,10 @@ from business_assistant.config.constants import (
     CMD_RESTART,
     ERR_AGENT_FAILED,
     LOG_AGENT_ERROR,
+    PLUGIN_DATA_COMMAND_HANDLERS,
     PLUGIN_DATA_FILE_HANDLERS,
+    PLUGIN_DATA_MESSAGE_MODIFIERS,
+    PLUGIN_DATA_RESPONSE_PROCESSORS,
     RESP_CHAT_CLEARED,
     RESP_RESTART_TRIGGERED,
     RESTART_FLAG_FILE,
@@ -74,6 +77,7 @@ class AIMessageHandler:
         try:
             file_prefix = self._process_attachments(message)
             agent_text = file_prefix + message.text if file_prefix else message.text
+            agent_text = self._apply_message_modifiers(agent_text, message.user_id)
 
             deps = Deps(
                 memory=self._memory,
@@ -97,11 +101,34 @@ class AIMessageHandler:
                 self._usage_tracker.log(
                     usage, new_history, message.user_id, self._model_name
                 )
-            return BotResponse(text=output)
+            response = BotResponse(text=output)
+            response = self._apply_response_processors(response, message.user_id)
+            return response
         except Exception:
             logger.error(LOG_AGENT_ERROR, exc_info=True)
             self._log_chat(message.user_id, message.text, ERR_AGENT_FAILED, error=True)
             return BotResponse(text=ERR_AGENT_FAILED)
+
+    def _apply_message_modifiers(self, text: str, user_id: str) -> str:
+        """Apply registered message modifiers to transform text before AI."""
+        for modifier in self._plugin_data.get(PLUGIN_DATA_MESSAGE_MODIFIERS, []):
+            try:
+                text = modifier(text, user_id, self._plugin_data)
+            except Exception:
+                logger.warning("Message modifier failed", exc_info=True)
+        return text
+
+    def _apply_response_processors(
+        self, response: BotResponse, user_id: str
+    ) -> BotResponse:
+        """Apply registered response processors to transform the response."""
+        processors = self._plugin_data.get(PLUGIN_DATA_RESPONSE_PROCESSORS, [])
+        for processor in processors:
+            try:
+                response = processor(response, user_id, self._plugin_data)
+            except Exception:
+                logger.warning("Response processor failed", exc_info=True)
+        return response
 
     def _process_attachments(self, message: BotMessage) -> str:
         """Download attachments and run file handlers. Returns context prefix."""
@@ -163,6 +190,15 @@ class AIMessageHandler:
             Path(RESTART_FLAG_FILE).touch()
             logger.info("Restart requested by user %s", user_id)
             return BotResponse(text=RESP_RESTART_TRIGGERED)
+
+        for handler in self._plugin_data.get(PLUGIN_DATA_COMMAND_HANDLERS, []):
+            try:
+                result = handler(text, user_id, self._plugin_data)
+                if result is not None:
+                    return result
+            except Exception:
+                logger.warning("Plugin command handler failed", exc_info=True)
+
         return None
 
     def _log_chat(self, user: str, input_text: str, output_text: str, *, error: bool) -> None:

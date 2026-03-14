@@ -6,7 +6,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from business_assistant.config.constants import PLUGIN_DATA_FILE_HANDLERS
+from business_assistant.config.constants import (
+    PLUGIN_DATA_COMMAND_HANDLERS,
+    PLUGIN_DATA_FILE_HANDLERS,
+    PLUGIN_DATA_MESSAGE_MODIFIERS,
+    PLUGIN_DATA_RESPONSE_PROCESSORS,
+)
 
 
 class PluginCategoryConflictError(Exception):
@@ -101,6 +106,38 @@ class PluginRegistry:
         self.plugin_data[PLUGIN_DATA_FILE_HANDLERS].register(
             mime_patterns, plugin_name, handler
         )
+
+    def register_response_processor(self, processor: Callable) -> None:
+        """Register a response processor that transforms responses before sending.
+
+        Processors are called in registration order with signature:
+        ``(BotResponse, user_id: str, plugin_data: dict) -> BotResponse``
+        """
+        if PLUGIN_DATA_RESPONSE_PROCESSORS not in self.plugin_data:
+            self.plugin_data[PLUGIN_DATA_RESPONSE_PROCESSORS] = []
+        self.plugin_data[PLUGIN_DATA_RESPONSE_PROCESSORS].append(processor)
+
+    def register_command_handler(self, handler: Callable) -> None:
+        """Register a command handler that intercepts messages before the AI.
+
+        Handlers are called in registration order with signature:
+        ``(text: str, user_id: str, plugin_data: dict) -> BotResponse | None``
+
+        Return a BotResponse to short-circuit (skip AI), or None to continue.
+        """
+        if PLUGIN_DATA_COMMAND_HANDLERS not in self.plugin_data:
+            self.plugin_data[PLUGIN_DATA_COMMAND_HANDLERS] = []
+        self.plugin_data[PLUGIN_DATA_COMMAND_HANDLERS].append(handler)
+
+    def register_message_modifier(self, modifier: Callable) -> None:
+        """Register a message modifier that transforms text before the AI sees it.
+
+        Modifiers are called in registration order with signature:
+        ``(text: str, user_id: str, plugin_data: dict) -> str``
+        """
+        if PLUGIN_DATA_MESSAGE_MODIFIERS not in self.plugin_data:
+            self.plugin_data[PLUGIN_DATA_MESSAGE_MODIFIERS] = []
+        self.plugin_data[PLUGIN_DATA_MESSAGE_MODIFIERS].append(modifier)
 
     @property
     def plugins(self) -> list[PluginInfo]:
