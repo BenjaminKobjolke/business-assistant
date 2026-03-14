@@ -111,6 +111,58 @@ tools = [Tool(_list_items, name="list_items")]
 - Return type must be `str`
 - Tool names must be unique across all plugins
 
+## Tool Consolidation
+
+OpenAI limits function tools to **128 per API call**. All plugins share this budget, so minimize tool count by consolidating related operations.
+
+### When to Consolidate
+
+- **CRUD groups**: add/remove/list/update operations on the same resource
+- **Draft/send pairs**: same parameters, different execution mode
+- **Get/set pairs**: settings, configuration, simple state
+
+### Pattern
+
+Use a single function with an `action: str` parameter:
+
+```python
+def _manage_items(
+    ctx: RunContext[Deps], action: str, name: str = "", value: str = "",
+) -> str:
+    """Manage items. action: add, remove, list.
+
+    Args:
+        action: Operation to perform (add, remove, list).
+        name: Item name (required for add/remove).
+        value: Item value (required for add).
+    """
+    svc = ctx.deps.plugin_data[PLUGIN_DATA_SERVICE]
+    if action == "add":
+        return svc.add_item(name, value)
+    if action == "remove":
+        return svc.remove_item(name)
+    if action == "list":
+        return svc.list_items()
+    return f"ERROR: Unknown action '{action}'. Valid: add, remove, list."
+
+# Registers as 1 tool instead of 3
+tools = [Tool(_manage_items, name="manage_items")]
+```
+
+### When NOT to Consolidate
+
+- Tools with **fundamentally different semantics** (e.g., `pm_run_workflow` returns AI instructions to follow, while `pm_manage_workflow` performs CRUD — keep these separate)
+- Tools with **very different parameter shapes** that would make the combined signature confusing
+
+### Guidelines
+
+- Aim for **~10 tools per plugin** maximum
+- The `action` parameter should use clear, lowercase values: `add`, `remove`, `list`, `get`, `set`, `create`, `update`, `delete`
+- Always include a fallback for unknown actions with an error message listing valid values
+- Update `SYSTEM_PROMPT_*` in `constants.py` to document the consolidated tool's actions
+
+See [TOOL_LIMIT.md](../TOOL_LIMIT.md) for the full tool budget and consolidation history.
+
 ## Plugin Categories
 
 Categories declare what feature area a plugin provides. Only one plugin per category is allowed:
