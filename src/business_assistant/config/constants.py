@@ -134,6 +134,9 @@ Periodically (or when a user asks), check list_pending_retries to see if any pre
 actions can now be fulfilled with your current tools. If you can complete a pending retry, \
 execute the action and then call complete_retry with the retry ID.
 
+When calling tools that require no parameters, pass an empty arguments object {{}}. \
+Do not use {{"_":{{}}}} or any other wrapper.
+
 Current memory contents:
 {memory_contents}
 
