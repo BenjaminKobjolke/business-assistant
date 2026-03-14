@@ -81,6 +81,44 @@ def manage_items(ctx, action: str, name: str = "") -> str:
 **Calendar plugin (9 → 8, saved 1):**
 - `create_event` + `create_all_day_event` → `create_event(all_day=False)`
 
+## Solution: Dynamic Tool Loading (Category Router)
+
+In addition to consolidation, the bot uses a **two-API-call architecture** to load only the tools needed per request:
+
+1. **Call 1 (Router):** A cheap/fast model (configurable via `ROUTER_MODEL` env var, default `gpt-5-mini`) receives the user's message + descriptions of available plugin categories. It returns which categories are needed.
+2. **Call 2 (Executor):** Only the selected categories' tools are loaded via `agent.override(tools=...)`. The main model processes the request with a reduced tool set.
+
+This means the total tool count across all plugins can safely exceed 128 — only the per-request count matters.
+
+### Example Tool Counts Per Request
+
+| Message | Categories | Tools |
+|---------|-----------|------:|
+| "check my emails" | email | ~30 |
+| "check emails and add dates" | email + calendar | ~38 |
+| "create a task from this email" | email + PM + todo | ~66 |
+| "hello" (general chat) | none | ~7 |
+
+### Safety Guard
+
+Before the second API call, the handler checks that `len(selected_tools) < 128`. If it would exceed the limit, it falls back to core-only tools.
+
+### Usage Tracking
+
+Both API calls are tracked separately in the usage logs. The router calls appear under the router model name (e.g., `gpt-5-mini`) and main calls under the main model (e.g., `gpt-4o`).
+
+### Configuration
+
+```env
+ROUTER_MODEL=gpt-5-mini   # Model for category selection (default: gpt-5-mini)
+```
+
+### Key Files
+
+- `src/business_assistant/agent/router.py` — `CategoryRouter` with AI-based category selection
+- `src/business_assistant/plugins/registry.py` — `tools_for_categories()`, `prompts_for_categories()`
+- `src/business_assistant/bot/handler.py` — Two-phase flow with `agent.override()`
+
 ## Automated Guard
 
 `tests/test_tool_count.py` loads all plugins and asserts the total tool count stays under 128. This test runs as part of the standard test suite.
@@ -89,4 +127,6 @@ def manage_items(ctx, action: str, name: str = "") -> str:
 
 - Aim for ~10 tools maximum per plugin
 - Merge CRUD groups (add/remove/list) into single tools with an `action` parameter
+- Set a meaningful `category` on your `PluginInfo` so the router can select it
+- Set a clear `description` — the router AI uses it to decide when to load your plugin
 - See `docs/plugins/plugin-development-guide.md` for the consolidation pattern

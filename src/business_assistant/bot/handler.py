@@ -14,11 +14,13 @@ from pydantic_ai.messages import ModelRequest, RetryPromptPart, ToolReturnPart
 from pydantic_ai.usage import RunUsage
 
 from business_assistant.agent.deps import Deps
+from business_assistant.agent.router import CategoryRouter
 from business_assistant.config.constants import (
     CMD_CLEAR,
     CMD_RESTART,
     ERR_AGENT_FAILED,
     LOG_AGENT_ERROR,
+    OPENAI_MAX_TOOLS,
     PLUGIN_DATA_COMMAND_HANDLERS,
     PLUGIN_DATA_FILE_HANDLERS,
     PLUGIN_DATA_MESSAGE_MODIFIERS,
@@ -30,6 +32,7 @@ from business_assistant.config.constants import (
 from business_assistant.config.settings import AppSettings
 from business_assistant.files.downloader import FileDownloader
 from business_assistant.memory.store import MemoryStore
+from business_assistant.plugins.registry import PluginRegistry
 from business_assistant.usage.tracker import UsageTracker
 
 logger = logging.getLogger(__name__)
@@ -52,6 +55,9 @@ class AIMessageHandler:
         usage_tracker: UsageTracker | None = None,
         model_name: str = "",
         file_downloader: FileDownloader | None = None,
+        registry: PluginRegistry | None = None,
+        router: CategoryRouter | None = None,
+        core_tools: list | None = None,
     ) -> None:
         self._agent = agent
         self._memory = memory
@@ -60,6 +66,9 @@ class AIMessageHandler:
         self._usage_tracker = usage_tracker
         self._model_name = model_name
         self._file_downloader = file_downloader
+        self._registry = registry
+        self._router = router
+        self._core_tools = core_tools or []
         self._executor = ThreadPoolExecutor(max_workers=2)
         self._chat_log_path = Path(settings.chat_log_file)
         self._chat_log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -79,6 +88,48 @@ class AIMessageHandler:
             agent_text = file_prefix + message.text if file_prefix else message.text
             agent_text = self._apply_message_modifiers(agent_text, message.user_id)
 
+            # Phase 1: Route to categories (if router is configured)
+            selected_tools = None
+            selected_instructions: str | None = None
+            if self._router and self._registry:
+                routing_result = self._router.route(agent_text)
+
+                # Track router usage
+                if self._usage_tracker and routing_result.usage:
+                    self._usage_tracker.log(
+                        routing_result.usage, [],
+                        message.user_id, self._router.model_name,
+                    )
+
+                category_tools = self._registry.tools_for_categories(
+                    routing_result.categories
+                )
+                selected_tools = list(self._core_tools) + category_tools
+
+                # Guard: ensure we don't exceed OpenAI tool limit
+                if len(selected_tools) >= OPENAI_MAX_TOOLS:
+                    logger.warning(
+                        "Categories %s yield %d tools (limit %d), "
+                        "falling back to core only",
+                        routing_result.categories,
+                        len(selected_tools),
+                        OPENAI_MAX_TOOLS,
+                    )
+                    selected_tools = list(self._core_tools)
+                    selected_instructions = ""
+                else:
+                    selected_instructions = (
+                        self._registry.prompts_for_categories(
+                            routing_result.categories
+                        )
+                    )
+                    logger.info(
+                        "Routed user=%s categories=%s tools=%d",
+                        message.user_id,
+                        routing_result.categories,
+                        len(selected_tools),
+                    )
+
             deps = Deps(
                 memory=self._memory,
                 settings=self._settings,
@@ -91,6 +142,8 @@ class AIMessageHandler:
                 agent_text,
                 deps,
                 history,
+                selected_tools,
+                selected_instructions,
             )
             output, new_history, usage = future.result(timeout=120)
             self._histories[message.user_id] = _safe_truncate(
@@ -173,10 +226,30 @@ class AIMessageHandler:
         return ""
 
     def _run_agent(
-        self, text: str, deps: Deps, message_history: list
+        self,
+        text: str,
+        deps: Deps,
+        message_history: list,
+        tools: list | None = None,
+        instructions: str | None = None,
     ) -> tuple[str, list, RunUsage]:
-        """Run the PydanticAI agent synchronously (called from thread pool)."""
-        result = self._agent.run_sync(text, deps=deps, message_history=message_history)
+        """Run the PydanticAI agent synchronously (called from thread pool).
+
+        When tools/instructions are provided, uses agent.override() to
+        temporarily replace the agent's tools for this request only.
+        """
+        if tools is not None:
+            override_kwargs: dict = {"tools": tools}
+            if instructions is not None:
+                override_kwargs["instructions"] = instructions
+            with self._agent.override(**override_kwargs):
+                result = self._agent.run_sync(
+                    text, deps=deps, message_history=message_history,
+                )
+        else:
+            result = self._agent.run_sync(
+                text, deps=deps, message_history=message_history,
+            )
         return result.output, result.all_messages(), result.usage()
 
     def _handle_command(self, text: str, user_id: str) -> BotResponse | None:

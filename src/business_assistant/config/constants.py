@@ -7,6 +7,7 @@ ENV_XMPP_DEFAULT_RECEIVER = "XMPP_DEFAULT_RECEIVER"
 ENV_XMPP_ALLOWED_JIDS = "XMPP_ALLOWED_JIDS"
 ENV_OPENAI_API_KEY = "OPENAI_API_KEY"
 ENV_OPENAI_MODEL = "OPENAI_MODEL"
+ENV_ROUTER_MODEL = "ROUTER_MODEL"
 ENV_MEMORY_FILE = "MEMORY_FILE"
 ENV_PLUGINS = "PLUGINS"
 ENV_USER_TIMEZONE = "USER_TIMEZONE"
@@ -18,6 +19,7 @@ OPENAI_MAX_TOOLS = 128
 
 # Defaults
 DEFAULT_OPENAI_MODEL = "gpt-4o"
+DEFAULT_ROUTER_MODEL = "gpt-5-mini"
 DEFAULT_USER_TIMEZONE = "Europe/Berlin"
 DEFAULT_MEMORY_FILE = "data/memory.json"
 DEFAULT_CHAT_LOG_FILE = "data/chat.log"
@@ -153,3 +155,15 @@ Current memory contents:
 {memory_contents}
 
 {plugin_extras}"""
+
+# Router system prompt (for category selection)
+ROUTER_SYSTEM_PROMPT = """\
+You are a message router. Given the user's message, select which tool categories \
+are needed to handle it. Return ONLY the category names as a list.
+
+Available categories:
+{category_list}
+
+If the message is general conversation (greetings, questions about yourself), \
+return an empty list.
+If unsure which categories are needed, include all potentially relevant ones."""

@@ -13,11 +13,22 @@ from business_assistant.plugins.registry import PluginRegistry
 logger = logging.getLogger(__name__)
 
 
-def build_system_prompt(registry: PluginRegistry, memory: MemoryStore) -> str:
-    """Build the full system prompt from base template, memory, and plugin extras."""
+def build_system_prompt(
+    registry: PluginRegistry,
+    memory: MemoryStore,
+    include_plugins: bool = True,
+) -> str:
+    """Build the system prompt from base template, memory, and optionally plugin extras.
+
+    Args:
+        registry: Plugin registry.
+        memory: Memory store.
+        include_plugins: If False, omit plugin extras (they'll be injected per-request).
+    """
+    plugin_extras = registry.system_prompt_extras() if include_plugins else ""
     return SYSTEM_PROMPT_BASE.format(
         memory_contents=memory.format_contents(),
-        plugin_extras=registry.system_prompt_extras(),
+        plugin_extras=plugin_extras,
     )
 
 

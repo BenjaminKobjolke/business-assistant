@@ -13,6 +13,7 @@ from .constants import (
     DEFAULT_MAX_CONVERSATION_HISTORY,
     DEFAULT_MEMORY_FILE,
     DEFAULT_OPENAI_MODEL,
+    DEFAULT_ROUTER_MODEL,
     DEFAULT_UPLOAD_DIR,
     DEFAULT_USAGE_LOG_DIR,
     DEFAULT_USER_TIMEZONE,
@@ -29,6 +30,7 @@ from .constants import (
     ENV_OPENAI_API_KEY,
     ENV_OPENAI_MODEL,
     ENV_PLUGINS,
+    ENV_ROUTER_MODEL,
     ENV_UPLOAD_DIR,
     ENV_USAGE_LOG_DIR,
     ENV_USER_TIMEZONE,
@@ -55,6 +57,7 @@ class OpenAISettings:
 
     api_key: str
     model: str
+    router_model: str = DEFAULT_ROUTER_MODEL
 
 
 @dataclass(frozen=True)
@@ -107,6 +110,7 @@ def load_settings() -> AppSettings:
     openai = OpenAISettings(
         api_key=os.environ.get(ENV_OPENAI_API_KEY, ""),
         model=os.environ.get(ENV_OPENAI_MODEL, DEFAULT_OPENAI_MODEL),
+        router_model=os.environ.get(ENV_ROUTER_MODEL, DEFAULT_ROUTER_MODEL),
     )
 
     raw_plugins = os.environ.get(ENV_PLUGINS, "")

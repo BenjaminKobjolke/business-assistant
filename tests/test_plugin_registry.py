@@ -241,3 +241,83 @@ class TestPluginCategory:
             PluginInfo(name="p1", description="P1", category=""), []
         )
         assert registry.plugin_for_category("") is None
+
+
+class TestCategoryBasedRetrieval:
+    def _make_registry(self):
+        from pydantic_ai import Tool
+
+        def dummy(ctx) -> str:
+            return "ok"
+
+        registry = PluginRegistry()
+        registry.register(
+            PluginInfo(
+                name="email", description="Email ops",
+                system_prompt_extra="Email prompt", category="email",
+            ),
+            [Tool(dummy, name="list_emails"), Tool(dummy, name="send_email")],
+        )
+        registry.register(
+            PluginInfo(
+                name="calendar", description="Calendar ops",
+                system_prompt_extra="Calendar prompt", category="calendar",
+            ),
+            [Tool(dummy, name="list_events")],
+        )
+        registry.register(
+            PluginInfo(
+                name="transcribe", description="Transcription",
+                system_prompt_extra="Transcribe prompt",
+            ),
+            [Tool(dummy, name="transcribe_audio")],
+        )
+        return registry
+
+    def test_tools_for_single_category(self) -> None:
+        registry = self._make_registry()
+        tools = registry.tools_for_categories({"email"})
+        names = {t.name for t in tools}
+        assert "list_emails" in names
+        assert "send_email" in names
+        assert "list_events" not in names
+        # Uncategorized always included
+        assert "transcribe_audio" in names
+
+    def test_tools_for_multiple_categories(self) -> None:
+        registry = self._make_registry()
+        tools = registry.tools_for_categories({"email", "calendar"})
+        names = {t.name for t in tools}
+        assert "list_emails" in names
+        assert "list_events" in names
+        assert "transcribe_audio" in names
+
+    def test_tools_for_empty_categories(self) -> None:
+        registry = self._make_registry()
+        tools = registry.tools_for_categories(set())
+        names = {t.name for t in tools}
+        # Only uncategorized
+        assert names == {"transcribe_audio"}
+
+    def test_prompts_for_categories(self) -> None:
+        registry = self._make_registry()
+        prompt = registry.prompts_for_categories({"email"})
+        assert "Email prompt" in prompt
+        assert "Transcribe prompt" in prompt
+        assert "Calendar prompt" not in prompt
+
+    def test_prompts_for_empty_categories(self) -> None:
+        registry = self._make_registry()
+        prompt = registry.prompts_for_categories(set())
+        assert "Transcribe prompt" in prompt
+        assert "Email prompt" not in prompt
+
+    def test_all_categories(self) -> None:
+        registry = self._make_registry()
+        cats = registry.all_categories()
+        assert cats == {"email", "calendar"}
+
+    def test_category_descriptions(self) -> None:
+        registry = self._make_registry()
+        descs = registry.category_descriptions()
+        assert descs == {"email": "Email ops", "calendar": "Calendar ops"}

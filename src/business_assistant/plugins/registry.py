@@ -43,6 +43,8 @@ class PluginRegistry:
         self._tools: list[Any] = []
         self._tool_plugin_map: dict[str, str] = {}
         self._category_map: dict[str, PluginInfo] = {}
+        self._category_tools: dict[str, list[Any]] = {}
+        self._category_prompts: dict[str, str] = {}
         self.plugin_data: dict[str, Any] = plugin_data if plugin_data is not None else {}
 
     def register(self, info: PluginInfo, tools: list[Any]) -> None:
@@ -58,6 +60,16 @@ class PluginRegistry:
             self._tool_plugin_map[tool.name] = info.name
         if info.category:
             self._category_map[info.category] = info
+
+        # Track tools and prompts by category (empty string for uncategorized)
+        key = info.category or ""
+        self._category_tools.setdefault(key, []).extend(tools)
+        if info.system_prompt_extra:
+            existing_prompt = self._category_prompts.get(key, "")
+            separator = "\n\n" if existing_prompt else ""
+            self._category_prompts[key] = (
+                existing_prompt + separator + info.system_prompt_extra
+            )
 
     def all_tools(self) -> list[Any]:
         """Return all registered PydanticAI Tool objects."""
@@ -138,6 +150,40 @@ class PluginRegistry:
         if PLUGIN_DATA_MESSAGE_MODIFIERS not in self.plugin_data:
             self.plugin_data[PLUGIN_DATA_MESSAGE_MODIFIERS] = []
         self.plugin_data[PLUGIN_DATA_MESSAGE_MODIFIERS].append(modifier)
+
+    def tools_for_categories(self, categories: set[str]) -> list[Any]:
+        """Return tools from specified categories + uncategorized plugins."""
+        result: list[Any] = []
+        # Always include uncategorized plugins (empty key)
+        result.extend(self._category_tools.get("", []))
+        for cat in categories:
+            result.extend(self._category_tools.get(cat, []))
+        return result
+
+    def prompts_for_categories(self, categories: set[str]) -> str:
+        """Return combined system_prompt_extra from specified categories + uncategorized."""
+        parts: list[str] = []
+        # Always include uncategorized prompts
+        uncategorized = self._category_prompts.get("", "")
+        if uncategorized:
+            parts.append(uncategorized)
+        for cat in categories:
+            prompt = self._category_prompts.get(cat, "")
+            if prompt:
+                parts.append(prompt)
+        return "\n\n".join(parts)
+
+    def all_categories(self) -> set[str]:
+        """Return all registered category strings (excluding empty)."""
+        return set(self._category_map.keys())
+
+    def category_descriptions(self) -> dict[str, str]:
+        """Return {category: plugin_description} for all plugins with a category."""
+        return {
+            info.category: info.description
+            for info in self._plugins
+            if info.category
+        }
 
     @property
     def plugins(self) -> list[PluginInfo]:

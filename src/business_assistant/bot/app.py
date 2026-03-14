@@ -12,7 +12,8 @@ from zoneinfo import ZoneInfo
 
 from bot_commander.manager import BotManager
 
-from business_assistant.agent.agent import create_agent
+from business_assistant.agent.agent import create_agent, get_core_tools
+from business_assistant.agent.router import CategoryRouter
 from business_assistant.config.constants import (
     BOT_TYPE_XMPP,
     CORE_PLUGIN_NAME,
@@ -95,7 +96,13 @@ class Application:
         load_plugins(registry, settings.plugin_names)
 
         model_name = f"openai:{settings.openai.model}"
-        agent = create_agent(registry, memory, model_name, timezone=settings.timezone)
+        agent = create_agent(
+            registry, memory, model_name,
+            timezone=settings.timezone, core_only=True,
+        )
+
+        router = CategoryRouter(registry, model=settings.openai.router_model)
+        core_tools = get_core_tools()
 
         tool_plugin_map = registry.tool_plugin_map()
         for name in (
@@ -119,6 +126,9 @@ class Application:
             usage_tracker=usage_tracker,
             model_name=settings.openai.model,
             file_downloader=downloader,
+            registry=registry,
+            router=router,
+            core_tools=core_tools,
         )
 
         config_provider = SettingsConfigProvider(settings.xmpp)

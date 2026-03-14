@@ -170,23 +170,8 @@ def _complete_retry(ctx: RunContext[Deps], retry_id: str) -> str:
     return f"Retry completed: {retry_id}"
 
 
-def create_agent(
-    registry: PluginRegistry,
-    memory: MemoryStore,
-    model: Any,
-    timezone: str = "Europe/Berlin",
-) -> Agent[Deps, str]:
-    """Create and configure the PydanticAI agent with all tools.
-
-    Args:
-        registry: Plugin registry containing plugin tools.
-        memory: Memory store for the memory tools.
-        model: The model name (e.g. 'openai:gpt-4o').
-        timezone: IANA timezone name for current-time display.
-
-    Returns:
-        Configured PydanticAI Agent.
-    """
+def get_core_tools() -> list[Tool]:
+    """Return the 7 core tools (memory + feedback) that are always loaded."""
     memory_tools = [
         Tool(_memory_get, name="memory_get", description="Look up a value from memory by key."),
         Tool(_memory_set, name="memory_set", description="Store a key-value pair in memory."),
@@ -221,8 +206,37 @@ def create_agent(
         ),
     ]
 
-    all_tools = memory_tools + feedback_tools + registry.all_tools()
-    static_prompt = build_system_prompt(registry, memory)
+    return memory_tools + feedback_tools
+
+
+def create_agent(
+    registry: PluginRegistry,
+    memory: MemoryStore,
+    model: Any,
+    timezone: str = "Europe/Berlin",
+    core_only: bool = False,
+) -> Agent[Deps, str]:
+    """Create and configure the PydanticAI agent.
+
+    Args:
+        registry: Plugin registry containing plugin tools.
+        memory: Memory store for the memory tools.
+        model: The model name (e.g. 'openai:gpt-4o').
+        timezone: IANA timezone name for current-time display.
+        core_only: If True, create agent with only core tools (memory + feedback).
+            Plugin tools are loaded per-request via agent.override().
+
+    Returns:
+        Configured PydanticAI Agent.
+    """
+    core_tools = get_core_tools()
+
+    if core_only:
+        all_tools = core_tools
+        static_prompt = build_system_prompt(registry, memory, include_plugins=False)
+    else:
+        all_tools = core_tools + registry.all_tools()
+        static_prompt = build_system_prompt(registry, memory)
 
     agent = Agent(
         model,
