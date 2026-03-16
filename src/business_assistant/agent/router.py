@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
@@ -32,13 +33,13 @@ class RoutingResult:
 class CategoryRouter:
     """Uses a lightweight AI model to select which plugin categories are needed."""
 
-    def __init__(self, registry: PluginRegistry, model: str) -> None:
+    def __init__(self, registry: PluginRegistry, model: Any, model_name: str = "") -> None:
         self._registry = registry
-        self._model = model
+        self._model_name = model_name or (model if isinstance(model, str) else str(model))
         self._all_categories = registry.all_categories()
         self._system_prompt = self._build_prompt()
         self._agent: Agent[None, CategorySelection] = Agent(
-            f"openai:{model}",
+            model,
             system_prompt=self._system_prompt,
             output_type=CategorySelection,
         )
@@ -46,7 +47,7 @@ class CategoryRouter:
     @property
     def model_name(self) -> str:
         """Return the model name used for routing."""
-        return self._model
+        return self._model_name
 
     def route(self, text: str) -> RoutingResult:
         """Select plugin categories needed for a user message.

@@ -32,6 +32,8 @@ from .constants import (
     ENV_OPENAI_API_KEY,
     ENV_OPENAI_MODEL,
     ENV_PLUGINS,
+    ENV_ROUTER_API_BASE_URL,
+    ENV_ROUTER_API_KEY,
     ENV_ROUTER_MODEL,
     ENV_UPLOAD_DIR,
     ENV_USAGE_LOG_DIR,
@@ -60,6 +62,8 @@ class OpenAISettings:
     api_key: str
     model: str
     router_model: str = DEFAULT_ROUTER_MODEL
+    router_api_key: str = ""
+    router_api_base_url: str = ""
 
 
 @dataclass(frozen=True)
@@ -114,6 +118,8 @@ def load_settings() -> AppSettings:
         api_key=os.environ.get(ENV_OPENAI_API_KEY, ""),
         model=os.environ.get(ENV_OPENAI_MODEL, DEFAULT_OPENAI_MODEL),
         router_model=os.environ.get(ENV_ROUTER_MODEL, DEFAULT_ROUTER_MODEL),
+        router_api_key=os.environ.get(ENV_ROUTER_API_KEY, ""),
+        router_api_base_url=os.environ.get(ENV_ROUTER_API_BASE_URL, ""),
     )
 
     raw_plugins = os.environ.get(ENV_PLUGINS, "")

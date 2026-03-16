@@ -8,6 +8,7 @@ import logging
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from bot_commander.manager import BotManager
@@ -105,7 +106,23 @@ class Application:
             timezone=settings.timezone, core_only=True,
         )
 
-        router = CategoryRouter(registry, model=settings.openai.router_model)
+        if settings.openai.router_api_base_url:
+            from pydantic_ai.models.openai import OpenAIChatModel
+            from pydantic_ai.providers.openai import OpenAIProvider
+
+            router_provider = OpenAIProvider(
+                base_url=settings.openai.router_api_base_url,
+                api_key=settings.openai.router_api_key or settings.openai.api_key,
+            )
+            router_model: Any = OpenAIChatModel(
+                settings.openai.router_model, provider=router_provider,
+            )
+        else:
+            router_model = f"openai:{settings.openai.router_model}"
+
+        router = CategoryRouter(
+            registry, model=router_model, model_name=settings.openai.router_model,
+        )
         core_tools = get_core_tools()
 
         tool_plugin_map = registry.tool_plugin_map()

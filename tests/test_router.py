@@ -73,7 +73,7 @@ class TestCategoryRouter:
         mock_result.usage.return_value = RunUsage()
         mock_agent_cls.return_value.run_sync.return_value = mock_result
 
-        router = CategoryRouter(registry, model="gpt-5-mini")
+        router = CategoryRouter(registry, model="openai:gpt-5-mini", model_name="gpt-5-mini")
         result = router.route("check my emails and meetings")
 
         assert result.categories == {"email", "calendar"}
@@ -89,7 +89,7 @@ class TestCategoryRouter:
         mock_result.usage.return_value = RunUsage()
         mock_agent_cls.return_value.run_sync.return_value = mock_result
 
-        router = CategoryRouter(registry, model="gpt-5-mini")
+        router = CategoryRouter(registry, model="openai:gpt-5-mini", model_name="gpt-5-mini")
         result = router.route("something")
 
         assert "email" in result.categories
@@ -103,7 +103,7 @@ class TestCategoryRouter:
         mock_result.usage.return_value = RunUsage()
         mock_agent_cls.return_value.run_sync.return_value = mock_result
 
-        router = CategoryRouter(registry, model="gpt-5-mini")
+        router = CategoryRouter(registry, model="openai:gpt-5-mini", model_name="gpt-5-mini")
         result = router.route("create project from email")
 
         assert "project_management" in result.categories
@@ -115,7 +115,7 @@ class TestCategoryRouter:
         registry = _make_registry()
         mock_agent_cls.return_value.run_sync.side_effect = RuntimeError("API error")
 
-        router = CategoryRouter(registry, model="gpt-5-mini")
+        router = CategoryRouter(registry, model="openai:gpt-5-mini", model_name="gpt-5-mini")
         result = router.route("anything")
 
         assert result.categories == registry.all_categories()
@@ -129,7 +129,7 @@ class TestCategoryRouter:
         mock_result.usage.return_value = RunUsage()
         mock_agent_cls.return_value.run_sync.return_value = mock_result
 
-        router = CategoryRouter(registry, model="gpt-5-mini")
+        router = CategoryRouter(registry, model="openai:gpt-5-mini", model_name="gpt-5-mini")
         result = router.route("hello")
 
         assert result.categories == set()
@@ -137,13 +137,26 @@ class TestCategoryRouter:
     def test_model_name_property(self) -> None:
         registry = _make_registry()
         with patch("business_assistant.agent.router.Agent"):
-            router = CategoryRouter(registry, model="gpt-5-mini")
+            router = CategoryRouter(
+                registry, model="openai:gpt-5-mini", model_name="gpt-5-mini",
+            )
         assert router.model_name == "gpt-5-mini"
+
+    def test_model_name_from_object_model(self) -> None:
+        registry = _make_registry()
+        mock_model = MagicMock()
+        with patch("business_assistant.agent.router.Agent"):
+            router = CategoryRouter(
+                registry, model=mock_model, model_name="deepseek-chat",
+            )
+        assert router.model_name == "deepseek-chat"
 
     def test_prompt_contains_all_categories(self) -> None:
         registry = _make_registry()
         with patch("business_assistant.agent.router.Agent"):
-            router = CategoryRouter(registry, model="gpt-5-mini")
+            router = CategoryRouter(
+                registry, model="openai:gpt-5-mini", model_name="gpt-5-mini",
+            )
         prompt = router._system_prompt
         assert "email" in prompt
         assert "calendar" in prompt
