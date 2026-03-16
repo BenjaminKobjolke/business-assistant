@@ -21,6 +21,7 @@ from business_assistant.config.constants import (
     ENV_RTM_TOKEN,
     LOG_APP_STARTING,
     LOG_APP_STOPPED,
+    PLUGIN_DATA_COMMAND_HANDLERS,
     PLUGIN_DATA_FTP_SERVICE,
     RTM_TOKEN_FILE,
 )
@@ -29,6 +30,7 @@ from business_assistant.files.downloader import FileDownloader
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.loader import load_plugins
 from business_assistant.plugins.registry import PluginRegistry
+from business_assistant.usage.command import create_usage_handler
 from business_assistant.usage.tracker import UsageTracker
 
 from .config_provider import SettingsConfigProvider
@@ -85,7 +87,9 @@ class Application:
         )
         memory = MemoryStore(settings.memory_file)
 
-        plugin_data: dict = {}
+        plugin_data: dict = {
+            PLUGIN_DATA_COMMAND_HANDLERS: [create_usage_handler(settings)],
+        }
 
         if settings.ftp:
             from business_assistant.upload.ftp_service import FtpUploadService

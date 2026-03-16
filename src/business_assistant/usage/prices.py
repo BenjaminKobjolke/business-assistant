@@ -14,7 +14,7 @@ LITELLM_PRICES_URL = (
     "model_prices_and_context_window.json"
 )
 
-_DEFAULT_DB_PATH = Path(__file__).parent / "price_cache.db"
+_DEFAULT_DB_PATH = Path("data/price_cache.db")
 _CACHE_TTL = timedelta(hours=24)
 
 

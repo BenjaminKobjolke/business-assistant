@@ -6,9 +6,9 @@ import json
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from log_analyze.aggregator import aggregate, get_periods
-from log_analyze.prices import ModelPricing, compute_cost
-from log_analyze.reader import filter_entries, read_entries
+from business_assistant.usage.aggregator import aggregate, get_periods
+from business_assistant.usage.prices import ModelPricing, compute_cost
+from business_assistant.usage.reader import filter_entries, read_entries
 
 
 class TestComputeCost:

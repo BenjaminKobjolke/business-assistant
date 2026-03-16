@@ -215,11 +215,12 @@ data
 tools/analyze_code_config.bat
 code_analysis_results/
 
-# Usage analyzer price cache
-tools/log_analyze/price_cache.db
+# Usage analyzer price cache (covered by data/ entry above)
 
 # Runtime feedback reports
 feedback/
 
 # PID lock file
 bot.pid
+/.mcp.json
+/tools/log_analyze/price_cache.db

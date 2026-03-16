@@ -45,6 +45,7 @@ ERR_PLUGIN_LOAD_FAILED = "Failed to load plugin: {name}"
 # Chat commands (matched case-insensitive)
 CMD_CLEAR = {"clear", "clear chat", "clear chat history"}
 CMD_RESTART = {"restart", "restart chat"}
+CMD_USAGE = {"usage"}
 
 # Command responses
 RESP_CHAT_CLEARED = "Chat history cleared."
@@ -111,6 +112,7 @@ PLUGIN_DATA_FTP_SERVICE = "ftp_upload"
 # Usage tracking
 ENV_USAGE_LOG_DIR = "USAGE_LOG_DIR"
 DEFAULT_USAGE_LOG_DIR = "logs/app/usage"
+DEFAULT_LEGACY_USAGE_FILE = "data/usage.log"
 USAGE_LOG_PREFIX = "usage"
 USAGE_LOG_SUFFIX = ".jsonl"
 CORE_PLUGIN_NAME = "core"
