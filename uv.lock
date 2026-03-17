@@ -652,6 +652,7 @@ dependencies = [
     { name = "business-assistant-rtm-plugin" },
     { name = "business-assistant-transcribe-plugin" },
     { name = "business-assistant-tts-plugin" },
+    { name = "business-assistant-web-plugin" },
     { name = "business-assistant-workingtimes-plugin" },
     { name = "huggingface-hub" },
     { name = "pydantic-ai" },
@@ -681,6 +682,7 @@ requires-dist = [
     { name = "business-assistant-rtm-plugin", editable = "../business-assistant-rtm-plugin" },
     { name = "business-assistant-transcribe-plugin", editable = "../business-assistant-transcribe-plugin" },
     { name = "business-assistant-tts-plugin", editable = "../business-assistant-tts-plugin" },
+    { name = "business-assistant-web-plugin", editable = "../business-assistant-web-plugin" },
     { name = "business-assistant-workingtimes-plugin", editable = "../business-assistant-workingtimes-plugin" },
     { name = "huggingface-hub", specifier = ">=0.34,<1.0" },
     { name = "pydantic-ai" },
@@ -690,6 +692,24 @@ requires-dist = [
     { name = "torchaudio", index = "https://download.pytorch.org/whl/cu128" },
     { name = "wtpsplit" },
 ]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "mypy", specifier = ">=1.0.0" },
+    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "ruff", specifier = ">=0.4.0" },
+]
+
+[[package]]
+name = "business-assistant-web-plugin"
+version = "0.1.0"
+source = { editable = "../business-assistant-web-plugin" }
+dependencies = [
+    { name = "business-assistant-v2" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "business-assistant-v2", editable = "." }]
 
 [package.metadata.requires-dev]
 dev = [

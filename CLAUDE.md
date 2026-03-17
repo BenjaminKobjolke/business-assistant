@@ -26,6 +26,7 @@ Plugin-based XMPP chatbot using PydanticAI + bot-commander. Source code in `src/
 - `D:\GIT\BenjaminKobjolke\business-assistant-rtm-plugin`
 - `D:\GIT\BenjaminKobjolke\business-assistant-transcribe-plugin`
 - `D:\GIT\BenjaminKobjolke\business-assistant-tts-plugin`
+- `D:\GIT\BenjaminKobjolke\business-assistant-web-plugin`
 - `D:\GIT\BenjaminKobjolke\business-assistant-workingtimes-plugin`
 
 ## Architecture

@@ -18,6 +18,7 @@ dependencies = [
     "business-assistant-workingtimes-plugin",
     "business-assistant-tts-plugin",
     "business-assistant-contacts-plugin",
+    "business-assistant-web-plugin",
     "qwen-tts",
     "huggingface-hub>=0.34,<1.0",
     "torch",
@@ -44,6 +45,7 @@ business-assistant-filesystem-plugin = { path = "D:/GIT/BenjaminKobjolke/busines
 business-assistant-workingtimes-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-workingtimes-plugin", editable = true }
 business-assistant-tts-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-tts-plugin", editable = true }
 business-assistant-contacts-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-contacts-plugin", editable = true }
+business-assistant-web-plugin = { path = "D:/GIT/BenjaminKobjolke/business-assistant-web-plugin", editable = true }
 torch = { index = "pytorch-cu128" }
 torchaudio = { index = "pytorch-cu128" }
 
