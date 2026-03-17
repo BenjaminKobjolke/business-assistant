@@ -13,8 +13,8 @@ from business_assistant.config.constants import OPENAI_MAX_TOOLS
 from business_assistant.plugins.loader import load_plugins
 from business_assistant.plugins.registry import PluginRegistry
 
-# Core tools registered in create_agent() (memory + feedback)
-CORE_TOOL_COUNT = 7
+# Core tools registered in create_agent() (memory + feedback + synonyms)
+CORE_TOOL_COUNT = 10
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 

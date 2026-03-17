@@ -134,6 +134,9 @@ class Application:
             "write_feedback",
             "list_pending_retries",
             "complete_retry",
+            "add_synonym",
+            "list_synonyms",
+            "delete_synonym",
         ):
             tool_plugin_map[name] = CORE_PLUGIN_NAME
         usage_tracker = UsageTracker(settings.usage_log_dir, tool_plugin_map)

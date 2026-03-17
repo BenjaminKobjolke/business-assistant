@@ -22,9 +22,11 @@ from business_assistant.agent.router import CategoryRouter, RoutingResult
 from business_assistant.bot.handler import AIMessageHandler, _safe_truncate
 from business_assistant.config.constants import (
     ERR_AGENT_FAILED,
+    PLUGIN_DATA_COMMAND_HANDLERS,
     PLUGIN_DATA_MESSAGE_MODIFIERS,
     RESP_CHAT_CLEARED,
     RESP_RESTART_TRIGGERED,
+    SYNONYM_PREFIX,
 )
 from business_assistant.files.downloader import FileDownloader
 from business_assistant.memory.store import MemoryStore
@@ -447,5 +449,61 @@ class TestChatLogModifiedText:
         with open(jsonl_files[0], encoding="utf-8") as f:
             entry = json.loads(f.readline())
         assert entry["in"] == "transcribed text"
+
+
+class TestSynonymResolution:
+    def test_synonym_resolves_to_builtin_command(self, tmp_memory_file: str) -> None:
+        """A synonym mapping to 'clear' should trigger the clear command."""
+        handler = _make_handler(agent_result="Reply", tmp_memory_file=tmp_memory_file)
+        handler._memory.set(f"{SYNONYM_PREFIX}löschen", "clear")
+        handler.handle(BotMessage(user_id="user@test.com", text="First"))
+
+        response = handler.handle(BotMessage(user_id="user@test.com", text="löschen"))
+        assert response.text == RESP_CHAT_CLEARED
+        assert "user@test.com" not in handler._histories
+
+    def test_synonym_resolves_to_plugin_command(self, tmp_memory_file: str) -> None:
+        """A synonym should resolve and be checked against plugin command handlers."""
+        def _plugin_handler(text: str, user_id: str, plugin_data: dict) -> BotResponse | None:
+            if text.lower().strip() == "my plugin cmd":
+                return BotResponse(text="Plugin handled!")
+            return None
+
+        handler = _make_handler(
+            agent_result="AI reply",
+            tmp_memory_file=tmp_memory_file,
+            plugin_data={PLUGIN_DATA_COMMAND_HANDLERS: [_plugin_handler]},
+        )
+        handler._memory.set(f"{SYNONYM_PREFIX}shortcut", "my plugin cmd")
+
+        response = handler.handle(BotMessage(user_id="user@test.com", text="shortcut"))
+        assert response.text == "Plugin handled!"
+
+    def test_synonym_case_insensitive(self, tmp_memory_file: str) -> None:
+        """Synonym lookup should be case-insensitive."""
+        handler = _make_handler(agent_result="Reply", tmp_memory_file=tmp_memory_file)
+        handler._memory.set(f"{SYNONYM_PREFIX}löschen", "clear")
+
+        response = handler.handle(BotMessage(user_id="user@test.com", text="LÖSCHEN"))
+        assert response.text == RESP_CHAT_CLEARED
+
+    def test_unknown_word_passes_through(self, tmp_memory_file: str) -> None:
+        """A word that is not a synonym should pass through to the AI agent."""
+        handler = _make_handler(agent_result="AI reply", tmp_memory_file=tmp_memory_file)
+
+        response = handler.handle(BotMessage(user_id="user@test.com", text="unknown"))
+        assert response.text == "AI reply"
+        handler._agent.run_sync.assert_called_once()
+
+    def test_no_recursive_resolution(self, tmp_memory_file: str) -> None:
+        """Synonyms should not chain — only one level of resolution."""
+        handler = _make_handler(agent_result="AI reply", tmp_memory_file=tmp_memory_file)
+        handler._memory.set(f"{SYNONYM_PREFIX}a", "b")
+        handler._memory.set(f"{SYNONYM_PREFIX}b", "clear")
+
+        # "a" resolves to "b", but "b" should NOT further resolve to "clear"
+        response = handler.handle(BotMessage(user_id="user@test.com", text="a"))
+        assert response.text == "AI reply"
+        handler._agent.run_sync.assert_called_once()
 
 

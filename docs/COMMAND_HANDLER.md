@@ -33,9 +33,10 @@ def register(registry: PluginRegistry) -> None:
 
 ### Execution Order
 
-1. Built-in commands (`clear`, `restart`)
-2. Plugin command handlers (in registration order)
-3. AI agent (only if no handler returned a response)
+1. Built-in commands (`clear`, `restart`) — checked against typed text
+2. Plugin command handlers (in registration order) — checked against typed text
+3. **Voice command check** — if the message has no typed text and an audio attachment was transcribed (summary starting with `Transcription: `), the transcription is checked against steps 1-2
+4. AI agent (only if no handler returned a response)
 
 ## Message Modifiers
 
@@ -74,6 +75,13 @@ Built-in commands (clear, restart)
 Plugin command handlers  -->  BotResponse (short-circuit)
     |  (all returned None)
     v
+Process attachments (download + file handlers)
+    |
+    v
+Voice command check (voice-only messages)
+    |  transcription matched a command?  -->  BotResponse (short-circuit)
+    |  (no match or typed text present)
+    v
 Message modifiers (transform text)
     |
     v
@@ -85,6 +93,29 @@ Response processors (transform response)
     v
 Bot adapter sends response
 ```
+
+## Synonyms
+
+Users can define custom command synonyms that map to existing commands. This is especially useful for voice input where spoken words (e.g. "löschen") need to trigger built-in commands (e.g. "clear").
+
+Synonyms are stored in the `MemoryStore` with a `synonym:` key prefix. When a message arrives, the handler checks if the normalized text matches a stored synonym and resolves it to the target command before any other command matching.
+
+### Management
+
+Synonyms are managed conversationally via three AI tools:
+
+- **add_synonym** — define a new synonym (e.g. "löschen" → "clear")
+- **list_synonyms** — show all defined synonyms
+- **delete_synonym** — remove a synonym
+
+### Resolution
+
+1. Incoming text is normalized (lowercased, trimmed)
+2. A memory lookup checks for `synonym:{normalized}`
+3. If found, the text is replaced with the target value
+4. Normal command matching proceeds (built-in → plugin → AI)
+
+Resolution is single-level only — synonyms cannot chain to other synonyms.
 
 ## Key Files
 

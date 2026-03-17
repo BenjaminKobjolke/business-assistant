@@ -8,14 +8,17 @@ from pydantic_ai import RunContext, Tool
 from pydantic_ai.models.test import TestModel
 
 from business_assistant.agent.agent import (
+    _add_synonym,
     _complete_retry,
+    _delete_synonym,
     _list_pending_retries,
+    _list_synonyms,
     _write_feedback,
     create_agent,
 )
 from business_assistant.agent.deps import Deps
 from business_assistant.agent.system_prompt import build_time_prompt
-from business_assistant.config.constants import DEFAULT_PENDING_RETRIES_SUBDIR
+from business_assistant.config.constants import DEFAULT_PENDING_RETRIES_SUBDIR, SYNONYM_PREFIX
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.registry import PluginInfo, PluginRegistry
 from tests.conftest import make_test_settings
@@ -306,3 +309,69 @@ class TestCompleteRetry:
         ctx = self._make_ctx(tmp_path)
         result = _complete_retry(ctx, "retry_done")
         assert result == "Retry already completed: retry_done"
+
+
+class TestSynonymTools:
+    def _make_ctx(self, tmp_path):
+        settings = make_test_settings()
+        deps = Deps(
+            memory=MemoryStore(str(tmp_path / "mem.json")),
+            settings=settings,
+            user_id="tester@test.com",
+            plugin_data={},
+        )
+        ctx = MagicMock(spec=RunContext)
+        ctx.deps = deps
+        return ctx
+
+    def test_add_synonym_stores_with_prefix(self, tmp_path) -> None:
+        ctx = self._make_ctx(tmp_path)
+        result = _add_synonym(ctx, "löschen", "clear")
+        assert "löschen" in result
+        assert "clear" in result
+        assert ctx.deps.memory.get(f"{SYNONYM_PREFIX}löschen") == "clear"
+
+    def test_list_synonyms_returns_formatted(self, tmp_path) -> None:
+        ctx = self._make_ctx(tmp_path)
+        ctx.deps.memory.set(f"{SYNONYM_PREFIX}löschen", "clear")
+        ctx.deps.memory.set(f"{SYNONYM_PREFIX}neustart", "restart")
+
+        result = _list_synonyms(ctx)
+        assert "löschen → clear" in result
+        assert "neustart → restart" in result
+
+    def test_list_synonyms_empty(self, tmp_path) -> None:
+        ctx = self._make_ctx(tmp_path)
+        result = _list_synonyms(ctx)
+        assert result == "No synonyms defined."
+
+    def test_list_synonyms_excludes_non_synonym_entries(self, tmp_path) -> None:
+        ctx = self._make_ctx(tmp_path)
+        ctx.deps.memory.set("contact:alice", "alice@example.com")
+        ctx.deps.memory.set(f"{SYNONYM_PREFIX}löschen", "clear")
+
+        result = _list_synonyms(ctx)
+        assert "löschen → clear" in result
+        assert "alice" not in result
+
+    def test_delete_synonym_existing(self, tmp_path) -> None:
+        ctx = self._make_ctx(tmp_path)
+        ctx.deps.memory.set(f"{SYNONYM_PREFIX}löschen", "clear")
+
+        result = _delete_synonym(ctx, "löschen")
+        assert "deleted" in result.lower()
+        assert ctx.deps.memory.get(f"{SYNONYM_PREFIX}löschen") is None
+
+    def test_delete_synonym_missing(self, tmp_path) -> None:
+        ctx = self._make_ctx(tmp_path)
+        result = _delete_synonym(ctx, "nonexistent")
+        assert "No synonym found" in result
+
+    def test_agent_includes_synonym_tools(self, tmp_memory_file: str) -> None:
+        memory = MemoryStore(tmp_memory_file)
+        registry = PluginRegistry()
+        agent = create_agent(registry, memory, TestModel())
+        tool_names = {t.name for t in agent._function_toolset.tools.values()}
+        assert "add_synonym" in tool_names
+        assert "list_synonyms" in tool_names
+        assert "delete_synonym" in tool_names

@@ -31,6 +31,8 @@ from business_assistant.config.constants import (
     RESP_CHAT_CLEARED,
     RESP_RESTART_TRIGGERED,
     RESTART_FLAG_FILE,
+    SYNONYM_PREFIX,
+    TRANSCRIPTION_PREFIX,
 )
 from business_assistant.config.settings import AppSettings
 from business_assistant.files.downloader import FileDownloader
@@ -89,7 +91,17 @@ class AIMessageHandler:
             return cmd_response
 
         try:
-            file_prefix = self._process_attachments(message)
+            file_prefix, transcriptions = self._process_attachments(message)
+
+            # Voice-only message: check if transcription matches a command
+            if not message.text.strip() and transcriptions:
+                for transcription in transcriptions:
+                    cmd_response = self._handle_command(
+                        transcription, message.user_id,
+                    )
+                    if cmd_response is not None:
+                        return cmd_response
+
             agent_text = file_prefix + message.text if file_prefix else message.text
             agent_text = self._apply_message_modifiers(agent_text, message.user_id)
 
@@ -145,14 +157,21 @@ class AIMessageHandler:
                 logger.warning("Response processor failed", exc_info=True)
         return response
 
-    def _process_attachments(self, message: BotMessage) -> str:
-        """Download attachments and run file handlers. Returns context prefix."""
+    def _process_attachments(
+        self, message: BotMessage,
+    ) -> tuple[str, list[str]]:
+        """Download attachments and run file handlers.
+
+        Returns (context_prefix, transcriptions) where *transcriptions* is a
+        list of raw transcription texts extracted from file handler results.
+        """
         if not message.attachments or not self._file_downloader:
-            return ""
+            return "", []
 
         from business_assistant.files.handler_registry import FileHandlerRegistry
 
         parts: list[str] = []
+        transcriptions: list[str] = []
         handler_registry: FileHandlerRegistry | None = self._plugin_data.get(
             PLUGIN_DATA_FILE_HANDLERS
         )
@@ -176,6 +195,10 @@ class AIMessageHandler:
                             parts.append(
                                 f"[File processed by {plugin_name}: {result.summary}]"
                             )
+                            if result.summary.startswith(TRANSCRIPTION_PREFIX):
+                                transcriptions.append(
+                                    result.summary[len(TRANSCRIPTION_PREFIX):]
+                                )
                         except Exception:
                             logger.warning(
                                 "File handler %s failed", plugin_name, exc_info=True
@@ -184,8 +207,8 @@ class AIMessageHandler:
                 logger.warning("Failed to download attachment: %s", att.url, exc_info=True)
 
         if parts:
-            return "\n".join(parts) + "\n"
-        return ""
+            return "\n".join(parts) + "\n", transcriptions
+        return "", transcriptions
 
     def _run_agent(
         self,
@@ -271,6 +294,10 @@ class AIMessageHandler:
     def _handle_command(self, text: str, user_id: str) -> BotResponse | None:
         """Check for special chat commands. Returns a BotResponse or None."""
         normalized = text.lower().strip()
+        synonym_target = self._memory.get(f"{SYNONYM_PREFIX}{normalized}")
+        if synonym_target is not None:
+            normalized = synonym_target.lower().strip()
+            text = normalized
         if normalized in CMD_CLEAR:
             self._histories.pop(user_id, None)
             self._conversation_starts.pop(user_id, None)

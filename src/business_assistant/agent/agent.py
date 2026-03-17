@@ -19,6 +19,7 @@ from business_assistant.config.constants import (
     ENV_FEEDBACK_DIR,
     RETRY_STATUS_COMPLETED,
     RETRY_STATUS_PENDING,
+    SYNONYM_PREFIX,
 )
 from business_assistant.memory.store import MemoryStore
 from business_assistant.plugins.registry import PluginRegistry
@@ -173,8 +174,38 @@ def _complete_retry(ctx: RunContext[Deps], retry_id: str) -> str:
     return f"Retry completed: {retry_id}"
 
 
+def _add_synonym(ctx: RunContext[Deps], synonym: str, target: str) -> str:
+    """Define a command synonym so that a custom word triggers an existing command."""
+    key = f"{SYNONYM_PREFIX}{synonym.lower().strip()}"
+    target_clean = target.lower().strip()
+    ctx.deps.memory.set(key, target_clean)
+    return f"Synonym saved: '{synonym.strip()}' → '{target_clean}'"
+
+
+def _list_synonyms(ctx: RunContext[Deps]) -> str:
+    """List all defined command synonyms."""
+    all_data = ctx.deps.memory.list_all()
+    synonyms = {
+        k[len(SYNONYM_PREFIX):]: v
+        for k, v in all_data.items()
+        if k.startswith(SYNONYM_PREFIX)
+    }
+    if not synonyms:
+        return "No synonyms defined."
+    lines = [f"- {s} → {t}" for s, t in sorted(synonyms.items())]
+    return "Command synonyms:\n" + "\n".join(lines)
+
+
+def _delete_synonym(ctx: RunContext[Deps], synonym: str) -> str:
+    """Delete a command synonym."""
+    key = f"{SYNONYM_PREFIX}{synonym.lower().strip()}"
+    if ctx.deps.memory.delete(key):
+        return f"Synonym deleted: '{synonym.strip()}'"
+    return f"No synonym found for '{synonym.strip()}'."
+
+
 def get_core_tools() -> list[Tool]:
-    """Return the 7 core tools (memory + feedback) that are always loaded."""
+    """Return the 10 core tools (memory + feedback + synonyms) that are always loaded."""
     memory_tools = [
         Tool(_memory_get, name="memory_get", description="Look up a value from memory by key."),
         Tool(_memory_set, name="memory_set", description="Store a key-value pair in memory."),
@@ -209,7 +240,28 @@ def get_core_tools() -> list[Tool]:
         ),
     ]
 
-    return memory_tools + feedback_tools
+    synonym_tools = [
+        Tool(
+            _add_synonym,
+            name="add_synonym",
+            description=(
+                "Define a command synonym so that a custom word "
+                "triggers an existing command."
+            ),
+        ),
+        Tool(
+            _list_synonyms,
+            name="list_synonyms",
+            description="List all defined command synonyms.",
+        ),
+        Tool(
+            _delete_synonym,
+            name="delete_synonym",
+            description="Delete a command synonym.",
+        ),
+    ]
+
+    return memory_tools + feedback_tools + synonym_tools
 
 
 def create_agent(

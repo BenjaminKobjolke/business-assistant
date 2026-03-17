@@ -77,6 +77,9 @@ ENV_RTM_TOKEN = "RTM_TOKEN"
 DEFAULT_FEEDBACK_DIR = "feedback"
 ENV_FEEDBACK_DIR = "FEEDBACK_DIR"
 
+# Synonyms
+SYNONYM_PREFIX = "synonym:"
+
 # Pending retries
 DEFAULT_PENDING_RETRIES_SUBDIR = "pending_retries"
 RETRY_STATUS_PENDING = "pending"
@@ -86,6 +89,9 @@ RETRY_STATUS_COMPLETED = "completed"
 DEFAULT_UPLOAD_DIR = "data/uploads"
 ENV_UPLOAD_DIR = "UPLOAD_DIR"
 PLUGIN_DATA_FILE_HANDLERS = "file_handlers"
+
+# Transcription prefix (convention used by transcribe plugin file handler)
+TRANSCRIPTION_PREFIX = "Transcription: "
 
 # Response processors
 PLUGIN_DATA_RESPONSE_PROCESSORS = "response_processors"
@@ -166,6 +172,10 @@ in the content and what tool or action would be needed in intended_action. \
 Periodically (or when a user asks), check list_pending_retries to see if any previously failed \
 actions can now be fulfilled with your current tools. If you can complete a pending retry, \
 execute the action and then call complete_retry with the retry ID.
+
+Users can define command synonyms so that custom words trigger existing commands. \
+When a user asks to save a word as a synonym for a command, use add_synonym. \
+Use list_synonyms to show all defined synonyms, and delete_synonym to remove one.
 
 When calling tools that require no parameters, pass an empty arguments object {{}}. \
 Do not use {{"_":{{}}}} or any other wrapper.
