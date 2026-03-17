@@ -142,6 +142,54 @@ class TestAttachmentProcessing:
         assert response.text == "Audio enabled!"
         handler._agent.run_sync.assert_not_called()
 
+    def test_voice_command_with_trailing_punctuation(self, tmp_memory_file: str) -> None:
+        """Transcription with trailing punctuation should still match a command."""
+        mock_downloader = MagicMock(spec=FileDownloader)
+        mock_downloader.download.return_value = DownloadedFile(
+            path="data/uploads/voice.ogg",
+            filename="voice.ogg",
+            mime_type="audio/ogg",
+            size=1000,
+        )
+
+        file_registry = FileHandlerRegistry()
+        file_registry.register(
+            ["audio/*"],
+            "transcribe",
+            lambda df, uid: FileHandlerResult(
+                summary="Transcription: Audio mode on.",
+            ),
+        )
+
+        def _cmd_handler(
+            text: str, user_id: str, plugin_data: dict,
+        ) -> BotResponse | None:
+            if text.lower().strip() == "audio mode on":
+                return BotResponse(text="Audio enabled!")
+            return None
+
+        plugin_data = {
+            PLUGIN_DATA_FILE_HANDLERS: file_registry,
+            PLUGIN_DATA_COMMAND_HANDLERS: [_cmd_handler],
+        }
+
+        handler = _make_handler(
+            agent_result="Should not reach AI",
+            tmp_memory_file=tmp_memory_file,
+            file_downloader=mock_downloader,
+            plugin_data=plugin_data,
+        )
+        att = Attachment(
+            url="https://example.com/voice.ogg",
+            filename="voice.ogg",
+            mime_type="audio/ogg",
+        )
+        msg = BotMessage(user_id="user@test.com", text="", attachments=(att,))
+
+        response = handler.handle(msg)
+        assert response.text == "Audio enabled!"
+        handler._agent.run_sync.assert_not_called()
+
     def test_voice_transcription_not_command_goes_to_ai(self, tmp_memory_file: str) -> None:
         """Voice-only message with non-command transcription should reach the AI."""
         mock_downloader = MagicMock(spec=FileDownloader)

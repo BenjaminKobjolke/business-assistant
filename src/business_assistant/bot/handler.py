@@ -293,7 +293,8 @@ class AIMessageHandler:
 
     def _handle_command(self, text: str, user_id: str) -> BotResponse | None:
         """Check for special chat commands. Returns a BotResponse or None."""
-        normalized = text.lower().strip()
+        normalized = text.lower().strip().rstrip(".,!?;:")
+        text = text.strip().rstrip(".,!?;:")
         synonym_target = self._memory.get(f"{SYNONYM_PREFIX}{normalized}")
         if synonym_target is not None:
             normalized = synonym_target.lower().strip()

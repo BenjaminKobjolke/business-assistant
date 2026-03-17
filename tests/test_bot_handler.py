@@ -338,6 +338,15 @@ class TestChatCommands:
             handler_mod.RESTART_FLAG_FILE = orig
             flag.unlink(missing_ok=True)
 
+    def test_command_with_trailing_punctuation_matches(self, tmp_memory_file: str) -> None:
+        """Trailing punctuation from transcription should not prevent command matching."""
+        handler = _make_handler(agent_result="Reply", tmp_memory_file=tmp_memory_file)
+        handler.handle(BotMessage(user_id="user@test.com", text="First"))
+
+        response = handler.handle(BotMessage(user_id="user@test.com", text="clear."))
+        assert response.text == RESP_CHAT_CLEARED
+        assert "user@test.com" not in handler._histories
+
     def test_normal_message_not_intercepted(self, tmp_memory_file: str) -> None:
         handler = _make_handler(agent_result="Hi!", tmp_memory_file=tmp_memory_file)
         response = handler.handle(BotMessage(user_id="user@test.com", text="hello"))
@@ -486,6 +495,16 @@ class TestSynonymResolution:
 
         response = handler.handle(BotMessage(user_id="user@test.com", text="LÖSCHEN"))
         assert response.text == RESP_CHAT_CLEARED
+
+    def test_synonym_with_trailing_punctuation(self, tmp_memory_file: str) -> None:
+        """Trailing punctuation should be stripped before synonym lookup."""
+        handler = _make_handler(agent_result="Reply", tmp_memory_file=tmp_memory_file)
+        handler._memory.set(f"{SYNONYM_PREFIX}löschen", "clear")
+        handler.handle(BotMessage(user_id="user@test.com", text="First"))
+
+        response = handler.handle(BotMessage(user_id="user@test.com", text="löschen."))
+        assert response.text == RESP_CHAT_CLEARED
+        assert "user@test.com" not in handler._histories
 
     def test_unknown_word_passes_through(self, tmp_memory_file: str) -> None:
         """A word that is not a synonym should pass through to the AI agent."""
