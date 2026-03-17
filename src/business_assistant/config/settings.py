@@ -15,6 +15,7 @@ from .constants import (
     DEFAULT_MEMORY_FILE,
     DEFAULT_OPENAI_MODEL,
     DEFAULT_ROUTER_MODEL,
+    DEFAULT_STARTUP_GREETING_MESSAGE,
     DEFAULT_UPLOAD_DIR,
     DEFAULT_USAGE_LOG_DIR,
     DEFAULT_USER_TIMEZONE,
@@ -35,6 +36,8 @@ from .constants import (
     ENV_ROUTER_API_BASE_URL,
     ENV_ROUTER_API_KEY,
     ENV_ROUTER_MODEL,
+    ENV_STARTUP_GREETING_ENABLED,
+    ENV_STARTUP_GREETING_MESSAGE,
     ENV_UPLOAD_DIR,
     ENV_USAGE_LOG_DIR,
     ENV_USER_TIMEZONE,
@@ -93,6 +96,8 @@ class AppSettings:
     timezone: str = DEFAULT_USER_TIMEZONE
     upload_dir: str = DEFAULT_UPLOAD_DIR
     max_conversation_history: int = DEFAULT_MAX_CONVERSATION_HISTORY
+    startup_greeting_enabled: bool = False
+    startup_greeting_message: str = DEFAULT_STARTUP_GREETING_MESSAGE
     ftp: FtpSettings | None = None
 
 
@@ -153,6 +158,13 @@ def load_settings() -> AppSettings:
                 ENV_MAX_CONVERSATION_HISTORY,
                 str(DEFAULT_MAX_CONVERSATION_HISTORY),
             )
+        ),
+        startup_greeting_enabled=os.environ.get(
+            ENV_STARTUP_GREETING_ENABLED, ""
+        ).lower()
+        in ("true", "1", "yes"),
+        startup_greeting_message=os.environ.get(
+            ENV_STARTUP_GREETING_MESSAGE, DEFAULT_STARTUP_GREETING_MESSAGE
         ),
         ftp=ftp,
     )

@@ -22,6 +22,7 @@ from business_assistant.config.constants import (
     ENV_RTM_TOKEN,
     LOG_APP_STARTING,
     LOG_APP_STOPPED,
+    LOG_STARTUP_GREETING_SENT,
     PLUGIN_DATA_COMMAND_HANDLERS,
     PLUGIN_DATA_FTP_SERVICE,
     RTM_TOKEN_FILE,
@@ -162,6 +163,11 @@ class Application:
             bot_type=BOT_TYPE_XMPP,
         )
         self._bot_manager.start()
+
+        if settings.startup_greeting_enabled and settings.xmpp.allowed_jids:
+            for jid in settings.xmpp.allowed_jids:
+                self._bot_manager.send_message(jid, settings.startup_greeting_message)
+                logger.info(LOG_STARTUP_GREETING_SENT, jid)
 
     def shutdown(self) -> None:
         """Shut down the bot and reset the XMPP singleton for restart."""

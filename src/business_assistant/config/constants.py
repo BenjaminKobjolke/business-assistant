@@ -124,6 +124,8 @@ DEFAULT_LEGACY_USAGE_FILE = "data/usage.log"
 USAGE_LOG_PREFIX = "usage"
 USAGE_LOG_SUFFIX = ".jsonl"
 CORE_PLUGIN_NAME = "core"
+USAGE_SOURCE_BOT = "bot"
+USAGE_SOURCE_TEST = "test"
 
 # Logging environment variables
 ENV_LOG_LEVEL = "LOG_LEVEL"
@@ -141,6 +143,12 @@ DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_LOG_DIR = "logs"
 DEFAULT_LOG_BACKUP_COUNT = 3
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+
+# Startup greeting
+ENV_STARTUP_GREETING_ENABLED = "STARTUP_GREETING_ENABLED"
+ENV_STARTUP_GREETING_MESSAGE = "STARTUP_GREETING_MESSAGE"
+DEFAULT_STARTUP_GREETING_MESSAGE = "Hi, how may I assist you today?"
+LOG_STARTUP_GREETING_SENT = "Sent startup greeting to %s"
 
 # Log messages
 LOG_PLUGIN_LOADED = "Loaded plugin: {name}"
