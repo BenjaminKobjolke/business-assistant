@@ -14,6 +14,20 @@ Plugin-based XMPP chatbot using PydanticAI + bot-commander. Source code in `src/
 - `uv run mypy src/` — Type check
 - `uv run python -m business_assistant.main` — Start the app
 
+## Plugin Repositories
+
+- `D:\GIT\BenjaminKobjolke\business-assistant-calendar-plugin`
+- `D:\GIT\BenjaminKobjolke\business-assistant-contacts-plugin`
+- `D:\GIT\BenjaminKobjolke\business-assistant-filesystem-plugin`
+- `D:\GIT\BenjaminKobjolke\business-assistant-google-auth`
+- `D:\GIT\BenjaminKobjolke\business-assistant-imap-plugin`
+- `D:\GIT\BenjaminKobjolke\business-assistant-obsidian-plugin`
+- `D:\GIT\BenjaminKobjolke\business-assistant-project-management-plugin`
+- `D:\GIT\BenjaminKobjolke\business-assistant-rtm-plugin`
+- `D:\GIT\BenjaminKobjolke\business-assistant-transcribe-plugin`
+- `D:\GIT\BenjaminKobjolke\business-assistant-tts-plugin`
+- `D:\GIT\BenjaminKobjolke\business-assistant-workingtimes-plugin`
+
 ## Architecture
 
 - `config/` — Settings (frozen dataclasses) + constants
