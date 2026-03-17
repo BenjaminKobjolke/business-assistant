@@ -7,12 +7,15 @@ import logging
 import signal
 import sys
 import threading
+import time
 from pathlib import Path
 
 from business_assistant.bot.app import Application
 from business_assistant.config.constants import (
     LOG_APP_RESTARTING,
     LOG_APP_SHUTDOWN_FLAG,
+    LOG_STALE_RESTART_FLAG,
+    LOG_STALE_SHUTDOWN_FLAG,
     PID_LOCK_FILE,
     RESTART_FLAG_FILE,
     SHUTDOWN_FLAG_FILE,
@@ -35,23 +38,39 @@ class _FlagWatcher:
         self._restart_path = restart_path
         self._shutdown_path = shutdown_path
         self._stop_event = stop_event
+        self._start_time = time.time()
         self.restart_requested = False
+
+    def _is_fresh(self, path: Path) -> bool:
+        """Return True if *path* was modified after this watcher was created."""
+        try:
+            return path.stat().st_mtime > self._start_time
+        except OSError:
+            return False
 
     def watch(self) -> None:
         """Poll every 5 seconds for flag files."""
         while not self._stop_event.is_set():
             if self._shutdown_path.exists():
-                self._shutdown_path.unlink(missing_ok=True)
-                self.restart_requested = False
-                logger.info(LOG_APP_SHUTDOWN_FLAG)
-                self._stop_event.set()
-                return
+                if not self._is_fresh(self._shutdown_path):
+                    logger.warning(LOG_STALE_SHUTDOWN_FLAG)
+                    self._shutdown_path.unlink(missing_ok=True)
+                else:
+                    self._shutdown_path.unlink(missing_ok=True)
+                    self.restart_requested = False
+                    logger.info(LOG_APP_SHUTDOWN_FLAG)
+                    self._stop_event.set()
+                    return
             if self._restart_path.exists():
-                self._restart_path.unlink(missing_ok=True)
-                self.restart_requested = True
-                logger.info(LOG_APP_RESTARTING)
-                self._stop_event.set()
-                return
+                if not self._is_fresh(self._restart_path):
+                    logger.warning(LOG_STALE_RESTART_FLAG)
+                    self._restart_path.unlink(missing_ok=True)
+                else:
+                    self._restart_path.unlink(missing_ok=True)
+                    self.restart_requested = True
+                    logger.info(LOG_APP_RESTARTING)
+                    self._stop_event.set()
+                    return
             self._stop_event.wait(timeout=5)
 
 
