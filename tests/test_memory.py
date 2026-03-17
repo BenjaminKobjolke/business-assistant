@@ -17,6 +17,9 @@ class TestMemoryStore:
     def test_get_missing_key(self, memory_store: MemoryStore) -> None:
         assert memory_store.get("nonexistent") is None
 
+    def test_get_missing_key_with_default(self, memory_store: MemoryStore) -> None:
+        assert memory_store.get("nope", "fallback") == "fallback"
+
     def test_delete_existing(self, memory_store: MemoryStore) -> None:
         memory_store.set("key", "value")
         assert memory_store.delete("key") is True

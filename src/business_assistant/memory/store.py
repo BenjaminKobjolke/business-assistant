@@ -48,10 +48,10 @@ class MemoryStore:
             encoding="utf-8",
         )
 
-    def get(self, key: str) -> str | None:
+    def get(self, key: str, default: str | None = None) -> str | None:
         """Get a value by key (case-insensitive)."""
         with self._lock:
-            return self._data.get(key.lower())
+            return self._data.get(key.lower(), default)
 
     def set(self, key: str, value: str) -> None:
         """Set a key-value pair (case-insensitive key)."""
