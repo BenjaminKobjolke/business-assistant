@@ -103,7 +103,8 @@ Wait a few seconds for the bot to stop, then run tests in this order:
 
 Fix any reported issues before committing.
 
-After testing, restart the bot:
+**IMPORTANT: Always restart the bot after testing is complete.** Forgetting this step leaves the bot offline.
+
 ```bash
 powershell -Command "Start-Process 'D:\GIT\BenjaminKobjolke\business-assistant-v2\start_after_tests.bat'"
 ```

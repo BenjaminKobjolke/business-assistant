@@ -27,4 +27,6 @@ Steps:
 
 10. If verification fails, report the failures and ask the user how to proceed.
 
-11. After all feedback files are processed, tell the user they can commit with /git:commit.
+11. **Restart the bot** after all verification is complete (as described in CLAUDE.md).
+
+12. After all feedback files are processed, tell the user they can commit with /git:commit.
