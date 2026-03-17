@@ -32,6 +32,9 @@ def format_period(stats: PeriodStats) -> str:
         f" | out {format_tokens(stats.total_output_tokens)}"
         f" | cache {format_tokens(stats.total_cache_read_tokens)}",
     ]
+    if len(stats.by_source) > 1:
+        for s in stats.by_source:
+            lines.append(f"  [{s.source}] {s.total_requests} req, {format_cost(s.total_cost)}")
     if len(stats.by_model) > 1:
         for m in stats.by_model:
             lines.append(f"  - {m.model}: {m.requests} req, {format_cost(m.cost)}")

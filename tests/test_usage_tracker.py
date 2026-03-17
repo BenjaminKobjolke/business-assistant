@@ -73,6 +73,7 @@ class TestUsageTrackerLog:
 
         assert entry["user"] == "user@test.com"
         assert entry["model"] == "gpt-4o"
+        assert entry["source"] == "bot"
         assert entry["input_tokens"] == 100
         assert entry["output_tokens"] == 50
         assert entry["requests"] == 2
@@ -168,6 +169,18 @@ class TestUsageTrackerLog:
         tracker._log_dir = tmp_path / "no" / "such" / "dir"
         # Should not raise
         tracker.log(RunUsage(), [], "user@test.com", "gpt-4o")
+
+    def test_explicit_source_test(self, tmp_path) -> None:
+        log_dir = str(tmp_path / "usage")
+        tracker = UsageTracker(log_dir, {})
+
+        tracker.log(RunUsage(input_tokens=10), [], "user@test.com", "gpt-4o", source="test")
+
+        files = list((tmp_path / "usage").glob("usage.*.jsonl"))
+        with open(files[0], encoding="utf-8") as f:
+            entry = json.loads(f.readline())
+
+        assert entry["source"] == "test"
 
     def test_creates_directory_on_init(self, tmp_path) -> None:
         log_dir = str(tmp_path / "new" / "usage")

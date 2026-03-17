@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from business_assistant.usage.aggregator import ModelStats, PeriodStats
+from business_assistant.usage.aggregator import ModelStats, PeriodStats, SourceStats
 from business_assistant.usage.formatter import (
     format_cost,
     format_period,
@@ -91,6 +91,41 @@ class TestFormatPeriod:
         result = format_period(stats)
         assert "- gpt-4o: 2 req, $0.0080" in result
         assert "- gpt-4o-mini: 1 req, $0.0020" in result
+
+
+    def test_source_breakdown_shown_when_multiple(self) -> None:
+        stats = PeriodStats(
+            label="Today",
+            total_requests=7,
+            total_input_tokens=700,
+            total_output_tokens=350,
+            total_cache_read_tokens=0,
+            total_cost=0.08,
+            by_model=[ModelStats("gpt-4o", 7, 700, 350, 0, 0.08)],
+            by_source=[
+                SourceStats("bot", 5, 500, 250, 0, 0.06),
+                SourceStats("test", 2, 200, 100, 0, 0.02),
+            ],
+        )
+        result = format_period(stats)
+        assert "[bot] 5 req, $0.0600" in result
+        assert "[test] 2 req, $0.0200" in result
+
+    def test_source_breakdown_hidden_when_single(self) -> None:
+        stats = PeriodStats(
+            label="Today",
+            total_requests=5,
+            total_input_tokens=500,
+            total_output_tokens=250,
+            total_cache_read_tokens=0,
+            total_cost=0.05,
+            by_model=[ModelStats("gpt-4o", 5, 500, 250, 0, 0.05)],
+            by_source=[
+                SourceStats("bot", 5, 500, 250, 0, 0.05),
+            ],
+        )
+        result = format_period(stats)
+        assert "[bot]" not in result
 
 
 class TestFormatReport:

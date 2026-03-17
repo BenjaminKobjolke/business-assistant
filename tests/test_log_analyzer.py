@@ -157,6 +157,56 @@ class TestAggregate:
         assert len(stats.by_model) == 2
 
 
+class TestAggregateBySource:
+    def test_groups_by_source(self) -> None:
+        entries = [
+            {"model": "gpt-4o", "source": "bot", "requests": 2, "input_tokens": 100,
+             "output_tokens": 50, "cache_read_tokens": 0},
+            {"model": "gpt-4o", "source": "test", "requests": 1, "input_tokens": 50,
+             "output_tokens": 25, "cache_read_tokens": 0},
+        ]
+        prices = {
+            "gpt-4o": ModelPricing(
+                input_cost=0.000005, output_cost=0.000015, cache_read_cost=0.0,
+            ),
+        }
+        stats = aggregate(entries, "Today", prices)
+
+        assert stats.total_requests == 3
+        assert len(stats.by_source) == 2
+
+        bot_src = next(s for s in stats.by_source if s.source == "bot")
+        test_src = next(s for s in stats.by_source if s.source == "test")
+
+        assert bot_src.total_requests == 2
+        assert bot_src.total_input_tokens == 100
+        assert test_src.total_requests == 1
+        assert test_src.total_input_tokens == 50
+
+    def test_missing_source_defaults_to_bot(self) -> None:
+        entries = [
+            {"model": "gpt-4o", "requests": 1, "input_tokens": 100,
+             "output_tokens": 50, "cache_read_tokens": 0},
+        ]
+        prices: dict = {}
+        stats = aggregate(entries, "Today", prices)
+
+        assert len(stats.by_source) == 1
+        assert stats.by_source[0].source == "bot"
+
+    def test_single_source_populates_by_source(self) -> None:
+        entries = [
+            {"model": "gpt-4o", "source": "test", "requests": 1, "input_tokens": 50,
+             "output_tokens": 25, "cache_read_tokens": 0},
+        ]
+        prices: dict = {}
+        stats = aggregate(entries, "Today", prices)
+
+        assert len(stats.by_source) == 1
+        assert stats.by_source[0].source == "test"
+        assert stats.by_source[0].total_requests == 1
+
+
 class TestGetPeriods:
     def test_returns_all_labels(self) -> None:
         tz = ZoneInfo("Europe/Berlin")

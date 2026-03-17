@@ -15,6 +15,7 @@ from business_assistant.config.constants import (
     CORE_PLUGIN_NAME,
     USAGE_LOG_PREFIX,
     USAGE_LOG_SUFFIX,
+    USAGE_SOURCE_BOT,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ class UsageTracker:
         messages: list[Any],
         user: str,
         model: str,
+        source: str = USAGE_SOURCE_BOT,
     ) -> None:
         """Extract tool info from messages and append a usage record."""
         try:
@@ -61,6 +63,7 @@ class UsageTracker:
 
             entry = {
                 "ts": now.isoformat(),
+                "source": source,
                 "user": user,
                 "model": model,
                 "input_tokens": usage.input_tokens,

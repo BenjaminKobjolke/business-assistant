@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 from pathlib import Path
+from unittest.mock import patch
 
+import pytest
+from pydantic_ai import Agent
+
+from business_assistant.config.constants import (
+    DEFAULT_USAGE_LOG_DIR,
+    USAGE_SOURCE_TEST,
+)
 from business_assistant.config.settings import AppSettings, OpenAISettings, XmppSettings
+from business_assistant.usage.tracker import UsageTracker
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 class FakeRawMessage:
@@ -70,3 +82,30 @@ def make_integration_settings(tmp_path: Path) -> AppSettings:
         plugin_names=["business_assistant_imap"],
         max_conversation_history=100,
     )
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _track_test_usage():
+    """Automatically log API usage from integration test agent.run_sync() calls."""
+    tracker = UsageTracker(
+        str(_PROJECT_ROOT / DEFAULT_USAGE_LOG_DIR),
+        tool_plugin_map={},
+    )
+    model_name = os.environ.get("OPENAI_MODEL", "gpt-4o")
+
+    original_run_sync = Agent.run_sync
+
+    def _wrapped_run_sync(self_agent, *args, **kwargs):
+        result = original_run_sync(self_agent, *args, **kwargs)
+        with contextlib.suppress(Exception):
+            tracker.log(
+                result.usage(),
+                result.all_messages(),
+                user="integration-test",
+                model=model_name,
+                source=USAGE_SOURCE_TEST,
+            )
+        return result
+
+    with patch.object(Agent, "run_sync", _wrapped_run_sync):
+        yield
