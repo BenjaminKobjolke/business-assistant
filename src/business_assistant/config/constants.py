@@ -6,6 +6,7 @@ ENV_XMPP_PASSWORD = "XMPP_PASSWORD"
 ENV_XMPP_DEFAULT_RECEIVER = "XMPP_DEFAULT_RECEIVER"
 ENV_XMPP_ALLOWED_JIDS = "XMPP_ALLOWED_JIDS"
 ENV_OPENAI_API_KEY = "OPENAI_API_KEY"
+ENV_OPENAI_API_BASE_URL = "OPENAI_API_BASE_URL"
 ENV_OPENAI_MODEL = "OPENAI_MODEL"
 ENV_ROUTER_MODEL = "ROUTER_MODEL"
 ENV_ROUTER_API_KEY = "ROUTER_API_KEY"
@@ -15,6 +16,7 @@ ENV_PLUGINS = "PLUGINS"
 ENV_USER_TIMEZONE = "USER_TIMEZONE"
 ENV_CHAT_LOG_FILE = "CHAT_LOG_FILE"
 ENV_MAX_CONVERSATION_HISTORY = "MAX_CONVERSATION_HISTORY"
+ENV_CONTEXT_LIMIT_THRESHOLD = "CONTEXT_LIMIT_THRESHOLD"
 
 # OpenAI limits
 OPENAI_MAX_TOOLS = 128
@@ -30,6 +32,7 @@ ENV_CHAT_LOG_DIR = "CHAT_LOG_DIR"
 LOG_TOOLS_SELECTED = "Tools for user=%s categories=%s: %s"
 LOG_STICKY_CATEGORIES = "Sticky categories for user=%s: %s"
 DEFAULT_MAX_CONVERSATION_HISTORY = 100
+DEFAULT_CONTEXT_LIMIT_THRESHOLD = 0
 
 # Bot config keys (used by BotConfigProvider)
 BOT_CFG_JID = "jid"
@@ -52,6 +55,11 @@ CMD_USAGE = {"usage"}
 # Command responses
 RESP_CHAT_CLEARED = "Chat history cleared."
 RESP_RESTART_TRIGGERED = "Restarting... please wait a moment."
+WARN_CONTEXT_LIMIT = (
+    "\n\n---\n"
+    "Note: This conversation has used {tokens} input tokens "
+    "(limit: {limit}). Consider sending 'clear' to reset context."
+)
 
 # Restart / Shutdown
 RESTART_FLAG_FILE = "restart.flag"
@@ -160,6 +168,7 @@ LOG_APP_SHUTDOWN_FLAG = "Shutdown requested via shutdown.flag — stopping..."
 LOG_STALE_RESTART_FLAG = "Stale restart.flag found (created before app start) — ignoring"
 LOG_STALE_SHUTDOWN_FLAG = "Stale shutdown.flag found (created before app start) — ignoring"
 LOG_AGENT_ERROR = "Error running AI agent"
+LOG_RESPONSE_DURATION = "Response for %s: %.2fs total (router=%.2fs, agent=%.2fs)"
 LOG_FILE_DOWNLOADED = "Downloaded file: %s (%d bytes)"
 LOG_FILE_DOWNLOAD_FAILED = "Failed to download file from %s"
 

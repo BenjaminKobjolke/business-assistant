@@ -5,13 +5,20 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
 from bot_commander.types import BotMessage, BotResponse
 from pydantic_ai import Agent
-from pydantic_ai.messages import ModelRequest, RetryPromptPart, ToolReturnPart
+from pydantic_ai.messages import (
+    ModelRequest,
+    ModelResponse,
+    RetryPromptPart,
+    ToolCallPart,
+    ToolReturnPart,
+)
 from pydantic_ai.usage import RunUsage
 
 from business_assistant.agent.deps import Deps
@@ -21,6 +28,7 @@ from business_assistant.config.constants import (
     CMD_RESTART,
     ERR_AGENT_FAILED,
     LOG_AGENT_ERROR,
+    LOG_RESPONSE_DURATION,
     LOG_STICKY_CATEGORIES,
     LOG_TOOLS_SELECTED,
     OPENAI_MAX_TOOLS,
@@ -33,6 +41,7 @@ from business_assistant.config.constants import (
     RESTART_FLAG_FILE,
     SYNONYM_PREFIX,
     TRANSCRIPTION_PREFIX,
+    WARN_CONTEXT_LIMIT,
 )
 from business_assistant.config.settings import AppSettings
 from business_assistant.files.downloader import FileDownloader
@@ -80,6 +89,7 @@ class AIMessageHandler:
         self._conversation_starts: dict[str, str] = {}
         self._last_categories: dict[str, set[str]] = {}
         self._histories: dict[str, list] = {}
+        self._context_warned: dict[str, bool] = {}
 
     def handle(self, message: BotMessage) -> BotResponse:
         """Handle an incoming bot message by routing to the AI agent.
@@ -90,6 +100,8 @@ class AIMessageHandler:
         if cmd_response is not None:
             return cmd_response
 
+        ts_in = datetime.now(tz=UTC)
+        agent_text = message.text
         try:
             file_prefix, transcriptions = self._process_attachments(message)
 
@@ -119,21 +131,51 @@ class AIMessageHandler:
                 history,
                 message.user_id,
             )
-            output, new_history, usage = future.result(timeout=120)
+            output, new_history, usage, router_dur, agent_dur = future.result(
+                timeout=120,
+            )
+            ts_out = datetime.now(tz=UTC)
+            total_dur = (ts_out - ts_in).total_seconds()
+            logger.info(
+                LOG_RESPONSE_DURATION, message.user_id,
+                total_dur, router_dur, agent_dur,
+            )
+            tools_called, tool_call_count = _extract_tool_info(new_history)
             self._histories[message.user_id] = _safe_truncate(
                 new_history, self._settings.max_conversation_history
             )
-            self._log_chat(message.user_id, agent_text, output, error=False)
+            self._log_chat(
+                message.user_id, agent_text, output, error=False,
+                ts_in=ts_in, ts_out=ts_out, duration_s=total_dur,
+                router_duration_s=router_dur, agent_duration_s=agent_dur,
+                tools_called=tools_called, tool_call_count=tool_call_count,
+                llm_requests=usage.requests,
+            )
             if self._usage_tracker:
                 self._usage_tracker.log(
                     usage, new_history, message.user_id, self._model_name
                 )
+            threshold = self._settings.context_limit_threshold
+            if (
+                threshold > 0
+                and usage.input_tokens >= threshold
+                and not self._context_warned.get(message.user_id)
+            ):
+                output += WARN_CONTEXT_LIMIT.format(
+                    tokens=usage.input_tokens, limit=threshold,
+                )
+                self._context_warned[message.user_id] = True
             response = BotResponse(text=output)
             response = self._apply_response_processors(response, message.user_id)
             return response
         except Exception:
             logger.error(LOG_AGENT_ERROR, exc_info=True)
-            self._log_chat(message.user_id, agent_text, ERR_AGENT_FAILED, error=True)
+            ts_out = datetime.now(tz=UTC)
+            self._log_chat(
+                message.user_id, agent_text, ERR_AGENT_FAILED, error=True,
+                ts_in=ts_in, ts_out=ts_out,
+                duration_s=(ts_out - ts_in).total_seconds(),
+            )
             return BotResponse(text=ERR_AGENT_FAILED)
 
     def _apply_message_modifiers(self, text: str, user_id: str) -> str:
@@ -216,14 +258,19 @@ class AIMessageHandler:
         deps: Deps,
         message_history: list,
         user_id: str = "",
-    ) -> tuple[str, list, RunUsage]:
+    ) -> tuple[str, list, RunUsage, float, float]:
         """Run the PydanticAI agent synchronously (called from thread pool).
 
         Routing and agent execution both run here (in the thread pool)
         to avoid event loop conflicts with the XMPP async loop.
-        """
-        tools, instructions = self._select_tools(text, user_id)
 
+        Returns (output, messages, usage, router_duration_s, agent_duration_s).
+        """
+        t0 = time.monotonic()
+        tools, instructions = self._select_tools(text, user_id)
+        router_dur = time.monotonic() - t0
+
+        t1 = time.monotonic()
         if tools is not None:
             override_kwargs: dict = {"tools": tools}
             if instructions is not None:
@@ -236,7 +283,9 @@ class AIMessageHandler:
             result = self._agent.run_sync(
                 text, deps=deps, message_history=message_history,
             )
-        return result.output, result.all_messages(), result.usage()
+        agent_dur = time.monotonic() - t1
+
+        return result.output, result.all_messages(), result.usage(), router_dur, agent_dur
 
     def _select_tools(
         self, text: str, user_id: str,
@@ -303,6 +352,7 @@ class AIMessageHandler:
             self._histories.pop(user_id, None)
             self._conversation_starts.pop(user_id, None)
             self._last_categories.pop(user_id, None)
+            self._context_warned.pop(user_id, None)
             logger.info("Chat history cleared for user %s", user_id)
             return BotResponse(text=RESP_CHAT_CLEARED)
         if normalized in CMD_RESTART:
@@ -338,21 +388,62 @@ class AIMessageHandler:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         return log_path
 
-    def _log_chat(self, user: str, input_text: str, output_text: str, *, error: bool) -> None:
+    def _log_chat(
+        self,
+        user: str,
+        input_text: str,
+        output_text: str,
+        *,
+        error: bool,
+        ts_in: datetime | None = None,
+        ts_out: datetime | None = None,
+        duration_s: float | None = None,
+        router_duration_s: float | None = None,
+        agent_duration_s: float | None = None,
+        tools_called: list[str] | None = None,
+        tool_call_count: int | None = None,
+        llm_requests: int | None = None,
+    ) -> None:
         """Append a JSON line to the per-conversation chat log file."""
         try:
-            entry = {
-                "ts": datetime.now(tz=UTC).isoformat(),
+            now = datetime.now(tz=UTC)
+            entry: dict = {
+                "ts_in": (ts_in or now).isoformat(),
+                "ts_out": (ts_out or now).isoformat(),
+                "duration_s": round(duration_s, 2) if duration_s is not None else None,
+                "router_duration_s": (
+                    round(router_duration_s, 2) if router_duration_s is not None else None
+                ),
+                "agent_duration_s": (
+                    round(agent_duration_s, 2) if agent_duration_s is not None else None
+                ),
+                "tools_called": tools_called,
+                "tool_call_count": tool_call_count,
+                "llm_requests": llm_requests,
                 "user": user,
                 "in": input_text,
                 "out": output_text,
                 "error": error,
             }
+            entry = {k: v for k, v in entry.items() if v is not None}
             log_path = self._get_chat_log_path(user)
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception:
             logger.warning("Failed to write chat log entry", exc_info=True)
+
+
+def _extract_tool_info(messages: list) -> tuple[list[str], int]:
+    """Extract deduplicated tool names and total call count from message history."""
+    seen: dict[str, None] = {}
+    count = 0
+    for msg in messages:
+        if isinstance(msg, ModelResponse):
+            for part in msg.parts:
+                if isinstance(part, ToolCallPart):
+                    count += 1
+                    seen.setdefault(part.tool_name, None)
+    return list(seen), count
 
 
 def _safe_truncate(

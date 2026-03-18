@@ -152,7 +152,11 @@ class TestChatLogging:
         assert entry["in"] == "Hello"
         assert entry["out"] == "Hi!"
         assert entry["error"] is False
-        assert "ts" in entry
+        assert "ts_in" in entry
+        assert "ts_out" in entry
+        assert isinstance(entry["duration_s"], float)
+        assert isinstance(entry["tools_called"], list)
+        assert isinstance(entry["llm_requests"], int)
 
     def test_chat_log_written_on_error(self, tmp_path: object, tmp_memory_file: str) -> None:
         log_dir = str(tmp_path / "chats")  # type: ignore[operator]
@@ -173,6 +177,9 @@ class TestChatLogging:
         assert entry["in"] == "Hello"
         assert entry["out"] == ERR_AGENT_FAILED
         assert entry["error"] is True
+        assert "ts_in" in entry
+        assert "ts_out" in entry
+        assert isinstance(entry["duration_s"], float)
 
     def test_chat_log_new_file_after_clear(
         self, tmp_path: object, tmp_memory_file: str,
@@ -524,5 +531,71 @@ class TestSynonymResolution:
         response = handler.handle(BotMessage(user_id="user@test.com", text="a"))
         assert response.text == "AI reply"
         handler._agent.run_sync.assert_called_once()
+
+
+class TestContextLimitWarning:
+    @staticmethod
+    def _make_handler_with_limit(
+        tmp_memory_file: str,
+        threshold: int,
+        input_tokens: int = 50000,
+    ) -> AIMessageHandler:
+        """Create a handler with context limit and controllable input_tokens."""
+        mock_agent = MagicMock()
+        mock_result = MagicMock()
+        mock_result.output = "OK"
+        mock_result.all_messages.return_value = [{"role": "user"}, {"role": "assistant"}]
+        mock_result.usage.return_value = RunUsage(input_tokens=input_tokens)
+        mock_agent.run_sync.return_value = mock_result
+
+        memory = MemoryStore(tmp_memory_file)
+        settings = make_test_settings(context_limit_threshold=threshold)
+
+        return AIMessageHandler(
+            agent=mock_agent,
+            memory=memory,
+            settings=settings,
+        )
+
+    def test_warning_appended_when_over_limit(self, tmp_memory_file: str) -> None:
+        handler = self._make_handler_with_limit(
+            tmp_memory_file, threshold=30000, input_tokens=35000,
+        )
+        response = handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
+        assert "35000 input tokens" in response.text
+        assert "clear" in response.text
+
+    def test_warning_only_once(self, tmp_memory_file: str) -> None:
+        handler = self._make_handler_with_limit(
+            tmp_memory_file, threshold=30000, input_tokens=35000,
+        )
+        r1 = handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
+        assert "input tokens" in r1.text
+
+        r2 = handler.handle(BotMessage(user_id="user@test.com", text="Again"))
+        assert "input tokens" not in r2.text
+
+    def test_warning_resets_after_clear(self, tmp_memory_file: str) -> None:
+        handler = self._make_handler_with_limit(
+            tmp_memory_file, threshold=30000, input_tokens=35000,
+        )
+        handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
+        handler.handle(BotMessage(user_id="user@test.com", text="clear"))
+        r3 = handler.handle(BotMessage(user_id="user@test.com", text="Hello again"))
+        assert "input tokens" in r3.text
+
+    def test_no_warning_when_under_limit(self, tmp_memory_file: str) -> None:
+        handler = self._make_handler_with_limit(
+            tmp_memory_file, threshold=30000, input_tokens=10000,
+        )
+        response = handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
+        assert response.text == "OK"
+
+    def test_no_warning_when_disabled(self, tmp_memory_file: str) -> None:
+        handler = self._make_handler_with_limit(
+            tmp_memory_file, threshold=0, input_tokens=50000,
+        )
+        response = handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
+        assert response.text == "OK"
 
 
