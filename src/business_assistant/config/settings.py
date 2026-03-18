@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from .constants import (
     DEFAULT_CHAT_LOG_DIR,
     DEFAULT_CHAT_LOG_FILE,
+    DEFAULT_CONTEXT_LIMIT_THRESHOLD,
     DEFAULT_FTP_PORT,
     DEFAULT_MAX_CONVERSATION_HISTORY,
     DEFAULT_MEMORY_FILE,
@@ -21,6 +22,7 @@ from .constants import (
     DEFAULT_USER_TIMEZONE,
     ENV_CHAT_LOG_DIR,
     ENV_CHAT_LOG_FILE,
+    ENV_CONTEXT_LIMIT_THRESHOLD,
     ENV_FTP_BASE_PATH,
     ENV_FTP_BASE_URL,
     ENV_FTP_HOST,
@@ -30,6 +32,7 @@ from .constants import (
     ENV_FTP_USERNAME,
     ENV_MAX_CONVERSATION_HISTORY,
     ENV_MEMORY_FILE,
+    ENV_OPENAI_API_BASE_URL,
     ENV_OPENAI_API_KEY,
     ENV_OPENAI_MODEL,
     ENV_PLUGINS,
@@ -64,6 +67,7 @@ class OpenAISettings:
 
     api_key: str
     model: str
+    api_base_url: str = ""
     router_model: str = DEFAULT_ROUTER_MODEL
     router_api_key: str = ""
     router_api_base_url: str = ""
@@ -96,6 +100,7 @@ class AppSettings:
     timezone: str = DEFAULT_USER_TIMEZONE
     upload_dir: str = DEFAULT_UPLOAD_DIR
     max_conversation_history: int = DEFAULT_MAX_CONVERSATION_HISTORY
+    context_limit_threshold: int = DEFAULT_CONTEXT_LIMIT_THRESHOLD
     startup_greeting_enabled: bool = False
     startup_greeting_message: str = DEFAULT_STARTUP_GREETING_MESSAGE
     ftp: FtpSettings | None = None
@@ -106,7 +111,7 @@ def load_settings() -> AppSettings:
 
     Calls dotenv.load_dotenv() to pick up .env files.
     """
-    load_dotenv()
+    load_dotenv(override=True)
 
     xmpp = XmppSettings(
         jid=os.environ.get(ENV_XMPP_JID, ""),
@@ -122,6 +127,7 @@ def load_settings() -> AppSettings:
     openai = OpenAISettings(
         api_key=os.environ.get(ENV_OPENAI_API_KEY, ""),
         model=os.environ.get(ENV_OPENAI_MODEL, DEFAULT_OPENAI_MODEL),
+        api_base_url=os.environ.get(ENV_OPENAI_API_BASE_URL, ""),
         router_model=os.environ.get(ENV_ROUTER_MODEL, DEFAULT_ROUTER_MODEL),
         router_api_key=os.environ.get(ENV_ROUTER_API_KEY, ""),
         router_api_base_url=os.environ.get(ENV_ROUTER_API_BASE_URL, ""),
@@ -157,6 +163,12 @@ def load_settings() -> AppSettings:
             os.environ.get(
                 ENV_MAX_CONVERSATION_HISTORY,
                 str(DEFAULT_MAX_CONVERSATION_HISTORY),
+            )
+        ),
+        context_limit_threshold=int(
+            os.environ.get(
+                ENV_CONTEXT_LIMIT_THRESHOLD,
+                str(DEFAULT_CONTEXT_LIMIT_THRESHOLD),
             )
         ),
         startup_greeting_enabled=os.environ.get(

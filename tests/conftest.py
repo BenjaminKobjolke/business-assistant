@@ -27,6 +27,7 @@ def make_test_settings(
     chat_log_dir: str = "logs/chat",
     usage_log_dir: str = "logs/app/usage",
     timezone: str = "Europe/Berlin",
+    context_limit_threshold: int = 0,
 ) -> AppSettings:
     """Create AppSettings for tests with customizable fields."""
     return AppSettings(
@@ -43,4 +44,5 @@ def make_test_settings(
         usage_log_dir=usage_log_dir,
         timezone=timezone,
         plugin_names=[],
+        context_limit_threshold=context_limit_threshold,
     )
