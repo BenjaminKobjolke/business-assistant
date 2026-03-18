@@ -333,7 +333,7 @@ xmpp = [
 requires-dist = [
     { name = "aiodns", marker = "extra == 'xmpp'", specifier = "<4.0.0" },
     { name = "telegram-bot", marker = "extra == 'telegram'", git = "https://github.com/BenjaminKobjolke/telegram-bot.git" },
-    { name = "xmpp-bot", marker = "extra == 'xmpp'", editable = "../xmpp-bot" },
+    { name = "xmpp-bot", marker = "extra == 'xmpp'", git = "https://github.com/BenjaminKobjolke/xmpp-bot.git" },
 ]
 provides-extras = ["telegram", "xmpp"]
 
@@ -4264,6 +4264,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/dd/8d/87d957b43bc8d494f4e3b1484b7d88d016b87e8fba9e797778b296458253/slixmpp-1.13.2-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:33bb56bc81bd1923ddca778385aabe5be7b65b70677175c6657d5687e52d47dc", size = 1094213, upload-time = "2026-02-08T19:05:00.494Z" },
 ]
 
+[package.optional-dependencies]
+xep-0363 = [
+    { name = "aiohttp" },
+]
+
 [[package]]
 name = "smart-open"
 version = "7.5.1"
@@ -5082,22 +5087,11 @@ wheels = [
 [[package]]
 name = "xmpp-bot"
 version = "0.1.0"
-source = { editable = "../xmpp-bot" }
+source = { git = "https://github.com/BenjaminKobjolke/xmpp-bot.git#6ec403e338e8bda4eaf79ab97ae78df9b24c9c59" }
 dependencies = [
     { name = "python-dotenv" },
-    { name = "slixmpp" },
+    { name = "slixmpp", extra = ["xep-0363"] },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4.0" },
-    { name = "slixmpp", specifier = ">=1.8.0" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "yarl"

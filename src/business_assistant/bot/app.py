@@ -101,9 +101,22 @@ class Application:
         registry = PluginRegistry(plugin_data=plugin_data)
         load_plugins(registry, settings.plugin_names)
 
-        model_name = f"openai:{settings.openai.model}"
+        if settings.openai.api_base_url:
+            from pydantic_ai.models.openai import OpenAIChatModel
+            from pydantic_ai.providers.openai import OpenAIProvider
+
+            main_provider = OpenAIProvider(
+                base_url=settings.openai.api_base_url,
+                api_key=settings.openai.api_key,
+            )
+            model: Any = OpenAIChatModel(
+                settings.openai.model, provider=main_provider,
+            )
+        else:
+            model = f"openai:{settings.openai.model}"
+
         agent = create_agent(
-            registry, memory, model_name,
+            registry, memory, model,
             timezone=settings.timezone, core_only=True,
         )
 
