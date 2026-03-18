@@ -15,8 +15,9 @@ Both calls use OpenAI-compatible APIs. The router can optionally use a different
 |---|---|---|---|
 | `OPENAI_API_KEY` | Yes | — | API key for the main agent |
 | `OPENAI_MODEL` | No | `gpt-4o` | Model name for the main agent |
+| `OPENAI_API_BASE_URL` | No | — | Base URL for the main agent API (if empty, uses OpenAI) |
 
-The main agent always uses the standard OpenAI API endpoint.
+When `OPENAI_API_BASE_URL` is set, the main agent uses that endpoint with `OPENAI_API_KEY`. When not set, the main agent uses the standard OpenAI API.
 
 ### Router
 
@@ -51,6 +52,19 @@ ROUTER_API_BASE_URL=https://api.deepseek.com
 
 The router uses DeepSeek for cheap category selection. The main agent uses OpenAI for tool execution.
 
+### DeepSeek for Both Calls
+
+```env
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=deepseek-chat
+OPENAI_API_BASE_URL=https://api.deepseek.com
+ROUTER_MODEL=deepseek-chat
+ROUTER_API_KEY=sk-...
+ROUTER_API_BASE_URL=https://api.deepseek.com
+```
+
+Both router and main agent use DeepSeek.
+
 ### Custom Router Model on OpenAI
 
 ```env
@@ -60,6 +74,35 @@ ROUTER_MODEL=gpt-4o-mini
 ```
 
 Both use OpenAI, but the router uses a cheaper model. No `ROUTER_API_BASE_URL` needed.
+
+## Performance Notes
+
+### Avoid Reasoning Models for the Main Agent
+
+Reasoning models (e.g. `deepseek-reasoner`/R1, `o1`, `o3`) perform internal chain-of-thought before responding, adding significant latency. For a tool-calling chatbot, standard chat models are faster and equally capable.
+
+**Benchmark** (same query, DeepSeek API, 2026-03-18):
+
+| Main Agent Model | Total | Router | Agent | Per LLM request |
+|---|---|---|---|---|
+| `deepseek-reasoner` (R1) | 25.16s | 4.66s | 20.5s | ~7.4s |
+| `deepseek-chat` (V3) | 14.2s | 3.09s | 11.11s | ~5.6s |
+
+Switching from `deepseek-reasoner` to `deepseek-chat` reduced total response time by 44%.
+
+### Measuring Performance
+
+Chat logs include timing and tool call data per message:
+
+- `duration_s` — total response time
+- `router_duration_s` / `agent_duration_s` — breakdown by phase
+- `tools_called` / `tool_call_count` / `llm_requests` — tool usage details
+
+Logs are at `logs/chat/<user>/<timestamp>.jsonl`.
+
+### Comparing Models
+
+Use [Artificial Analysis](https://artificialanalysis.ai/) to compare speed (tokens/sec), latency (TTFT), quality, and pricing across providers and models.
 
 ## API Compatibility Requirements
 
@@ -79,7 +122,7 @@ User Message
 [Tool Selection] --- Filters tools to selected categories
     |
     v
-[Main Agent Call] -> OpenAI API
+[Main Agent Call] -> OPENAI_API_BASE_URL (or OpenAI)
     |                 Model: OPENAI_MODEL
     |                 Tools: selected category tools + core tools
     v
