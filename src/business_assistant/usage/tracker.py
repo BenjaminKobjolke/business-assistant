@@ -52,6 +52,7 @@ class UsageTracker:
         user: str,
         model: str,
         source: str = USAGE_SOURCE_BOT,
+        provider: str = "",
     ) -> None:
         """Extract tool info from messages and append a usage record."""
         try:
@@ -61,11 +62,12 @@ class UsageTracker:
                 self._tool_plugin_map.get(t, CORE_PLUGIN_NAME) for t in tools_called
             ))
 
-            entry = {
+            entry: dict[str, Any] = {
                 "ts": now.isoformat(),
                 "source": source,
                 "user": user,
                 "model": model,
+                "provider": provider,
                 "input_tokens": usage.input_tokens,
                 "output_tokens": usage.output_tokens,
                 "cache_read_tokens": usage.cache_read_tokens,

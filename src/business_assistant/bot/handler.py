@@ -68,6 +68,8 @@ class AIMessageHandler:
         plugin_data: dict | None = None,
         usage_tracker: UsageTracker | None = None,
         model_name: str = "",
+        provider: str = "",
+        router_provider: str = "",
         file_downloader: FileDownloader | None = None,
         registry: PluginRegistry | None = None,
         router: CategoryRouter | None = None,
@@ -79,6 +81,8 @@ class AIMessageHandler:
         self._plugin_data = plugin_data or {}
         self._usage_tracker = usage_tracker
         self._model_name = model_name
+        self._provider = provider
+        self._router_provider = router_provider
         self._file_downloader = file_downloader
         self._registry = registry
         self._router = router
@@ -153,7 +157,8 @@ class AIMessageHandler:
             )
             if self._usage_tracker:
                 self._usage_tracker.log(
-                    usage, new_history, message.user_id, self._model_name
+                    usage, new_history, message.user_id, self._model_name,
+                    provider=self._provider,
                 )
             threshold = self._settings.context_limit_threshold
             if (
@@ -305,6 +310,7 @@ class AIMessageHandler:
             self._usage_tracker.log(
                 routing_result.usage, [],
                 user_id, self._router.model_name,
+                provider=self._router_provider,
             )
 
         # Merge with previously-used categories for this user (sticky)

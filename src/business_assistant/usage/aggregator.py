@@ -104,9 +104,13 @@ def _aggregate_entries(
     Returns (by_model, total_requests, total_input, total_output, total_cache, total_cost).
     """
     model_data: dict[str, dict] = {}
+    # Track models served by free providers (e.g. Ollama = local, no cost)
+    free_models: set[str] = set()
 
     for entry in entries:
         model = entry.get("model", "unknown")
+        if entry.get("provider") == "ollama":
+            free_models.add(model)
         if model not in model_data:
             model_data[model] = {
                 "requests": 0,
@@ -124,9 +128,12 @@ def _aggregate_entries(
     total_cost: float | None = 0.0
 
     for model, d in sorted(model_data.items()):
-        cost = compute_cost(
-            model, d["input_tokens"], d["output_tokens"], d["cache_read_tokens"], prices
-        )
+        if model in free_models:
+            cost: float | None = 0.0
+        else:
+            cost = compute_cost(
+                model, d["input_tokens"], d["output_tokens"], d["cache_read_tokens"], prices
+            )
         if cost is None:
             total_cost = None
         elif total_cost is not None:
