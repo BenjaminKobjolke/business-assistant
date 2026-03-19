@@ -18,7 +18,8 @@ class TestSettings:
         monkeypatch.setenv("MEMORY_FILE", "/tmp/mem.json")
         monkeypatch.setenv("PLUGINS", "plugin_a,plugin_b")
 
-        settings = load_settings()
+        with patch("business_assistant.config.settings.load_dotenv"):
+            settings = load_settings()
 
         assert settings.xmpp.jid == "bot@test.com"
         assert settings.xmpp.password == "pass123"
@@ -50,13 +51,26 @@ class TestSettings:
 
     def test_empty_plugins_string(self, monkeypatch) -> None:
         monkeypatch.setenv("PLUGINS", "")
-        settings = load_settings()
+        with patch("business_assistant.config.settings.load_dotenv"):
+            settings = load_settings()
         assert settings.plugin_names == []
 
     def test_plugins_with_whitespace(self, monkeypatch) -> None:
         monkeypatch.setenv("PLUGINS", " plugin_a , plugin_b , ")
-        settings = load_settings()
+        with patch("business_assistant.config.settings.load_dotenv"):
+            settings = load_settings()
         assert settings.plugin_names == ["plugin_a", "plugin_b"]
+
+    def test_ollama_base_url_from_env(self, monkeypatch) -> None:
+        monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+        settings = load_settings()
+        assert settings.openai.ollama_base_url == "http://localhost:11434/v1"
+
+    def test_ollama_base_url_default_empty(self, monkeypatch) -> None:
+        monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+        with patch("business_assistant.config.settings.load_dotenv"):
+            settings = load_settings()
+        assert settings.openai.ollama_base_url == ""
 
     def test_max_conversation_history_from_env(self, monkeypatch) -> None:
         monkeypatch.setenv("MAX_CONVERSATION_HISTORY", "50")
