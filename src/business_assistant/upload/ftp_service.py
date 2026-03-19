@@ -32,7 +32,7 @@ class FtpUploadService:
         try:
             ftp.connect(self._settings.host, self._settings.port)
             ftp.login(self._settings.username, self._settings.password)
-            if self._settings.use_tls and isinstance(ftp, ftplib.FTP_TLS):
+            if self._settings.use_tls:
                 ftp.prot_p()
             ftp.storbinary(f"STOR {remote_path}", io.BytesIO(data))
         finally:
