@@ -32,6 +32,7 @@ from .constants import (
     ENV_FTP_USERNAME,
     ENV_MAX_CONVERSATION_HISTORY,
     ENV_MEMORY_FILE,
+    ENV_OLLAMA_BASE_URL,
     ENV_OPENAI_API_BASE_URL,
     ENV_OPENAI_API_KEY,
     ENV_OPENAI_MODEL,
@@ -68,6 +69,7 @@ class OpenAISettings:
     api_key: str
     model: str
     api_base_url: str = ""
+    ollama_base_url: str = ""
     router_model: str = DEFAULT_ROUTER_MODEL
     router_api_key: str = ""
     router_api_base_url: str = ""
@@ -128,6 +130,7 @@ def load_settings() -> AppSettings:
         api_key=os.environ.get(ENV_OPENAI_API_KEY, ""),
         model=os.environ.get(ENV_OPENAI_MODEL, DEFAULT_OPENAI_MODEL),
         api_base_url=os.environ.get(ENV_OPENAI_API_BASE_URL, ""),
+        ollama_base_url=os.environ.get(ENV_OLLAMA_BASE_URL, ""),
         router_model=os.environ.get(ENV_ROUTER_MODEL, DEFAULT_ROUTER_MODEL),
         router_api_key=os.environ.get(ENV_ROUTER_API_KEY, ""),
         router_api_base_url=os.environ.get(ENV_ROUTER_API_BASE_URL, ""),

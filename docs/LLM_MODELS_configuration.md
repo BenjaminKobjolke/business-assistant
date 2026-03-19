@@ -5,7 +5,7 @@ The business assistant makes two separate AI API calls per user message:
 1. **Router call** — a lightweight model that selects which plugin categories (email, calendar, etc.) are needed for the message.
 2. **Main agent call** — the full model that processes the message with the selected tools.
 
-Both calls use OpenAI-compatible APIs. The router can optionally use a different API provider (e.g. DeepSeek) to reduce costs.
+Both calls use OpenAI-compatible APIs. The router can optionally use a different API provider (e.g. DeepSeek) to reduce costs. Local models via Ollama are also supported.
 
 ## Environment Variables
 
@@ -13,7 +13,7 @@ Both calls use OpenAI-compatible APIs. The router can optionally use a different
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `OPENAI_API_KEY` | Yes | — | API key for the main agent |
+| `OPENAI_API_KEY` | Yes* | — | API key for the main agent (*not required when using only Ollama) |
 | `OPENAI_MODEL` | No | `gpt-4o` | Model name for the main agent |
 | `OPENAI_API_BASE_URL` | No | — | Base URL for the main agent API (if empty, uses OpenAI) |
 
@@ -28,6 +28,18 @@ When `OPENAI_API_BASE_URL` is set, the main agent uses that endpoint with `OPENA
 | `ROUTER_API_BASE_URL` | No | — | Base URL for the router API (if empty, uses OpenAI) |
 
 When `ROUTER_API_BASE_URL` is set, the router uses that endpoint with `ROUTER_API_KEY` (or `OPENAI_API_KEY` as fallback). When not set, the router uses the standard OpenAI API.
+
+### Ollama (Local LLM)
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `OLLAMA_BASE_URL` | No | — | Ollama API base URL (e.g. `http://localhost:11434/v1`) |
+
+When `OLLAMA_BASE_URL` is set, both the main agent and router use Ollama — unless overridden by `OPENAI_API_BASE_URL` (main agent) or `ROUTER_API_BASE_URL` (router). No API key is needed for Ollama.
+
+**Provider priority:**
+- Main agent: `OPENAI_API_BASE_URL` > `OLLAMA_BASE_URL` > default OpenAI
+- Router: `ROUTER_API_BASE_URL` > `OLLAMA_BASE_URL` > default OpenAI
 
 ## Example Configurations
 
@@ -75,6 +87,40 @@ ROUTER_MODEL=gpt-4o-mini
 
 Both use OpenAI, but the router uses a cheaper model. No `ROUTER_API_BASE_URL` needed.
 
+### Ollama (Local LLM)
+
+```env
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OPENAI_MODEL=nemotron-3-nano
+ROUTER_MODEL=nemotron-3-nano
+```
+
+Both router and main agent use a local Ollama instance. No API key needed. Make sure the model is pulled first (`ollama pull nemotron-3-nano`).
+
+### Ollama + OpenAI Router
+
+```env
+OPENAI_API_KEY=sk-...
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OPENAI_MODEL=nemotron-3-nano
+ROUTER_MODEL=gpt-5-mini
+ROUTER_API_BASE_URL=
+```
+
+The main agent uses a local Ollama model. The router uses OpenAI (since `ROUTER_API_BASE_URL` is not set and no override, it falls back to default OpenAI).
+
+### DeepSeek + Ollama Router
+
+```env
+OPENAI_API_KEY=sk-...
+OPENAI_API_BASE_URL=https://api.deepseek.com
+OPENAI_MODEL=deepseek-chat
+OLLAMA_BASE_URL=http://localhost:11434/v1
+ROUTER_MODEL=nemotron-3-nano:4b
+```
+
+The main agent uses DeepSeek. The router uses a local Ollama model for free category selection. Do not set `ROUTER_API_BASE_URL` — it takes priority over `OLLAMA_BASE_URL`.
+
 ## Performance Notes
 
 ### Avoid Reasoning Models for the Main Agent
@@ -108,6 +154,7 @@ Use [Artificial Analysis](https://artificialanalysis.ai/) to compare speed (toke
 
 - **Router API**: Must support structured output (JSON response with a `categories` list). Most OpenAI-compatible APIs support this.
 - **Main agent API**: Must support tool/function calling. This is the standard OpenAI API.
+- **Ollama**: The model must support both tool calling and structured output. Models from the llama3, qwen2, and deepseek families generally work. Check [Ollama model compatibility](https://ollama.com/search?c=tools) for tool-calling support.
 
 ## Architecture
 
@@ -115,14 +162,14 @@ Use [Artificial Analysis](https://artificialanalysis.ai/) to compare speed (toke
 User Message
     |
     v
-[Router Call] -----> ROUTER_API_BASE_URL (or OpenAI)
+[Router Call] -----> ROUTER_API_BASE_URL > OLLAMA_BASE_URL > OpenAI
     |                 Model: ROUTER_MODEL
     |                 Returns: list of category names
     v
 [Tool Selection] --- Filters tools to selected categories
     |
     v
-[Main Agent Call] -> OPENAI_API_BASE_URL (or OpenAI)
+[Main Agent Call] -> OPENAI_API_BASE_URL > OLLAMA_BASE_URL > OpenAI
     |                 Model: OPENAI_MODEL
     |                 Tools: selected category tools + core tools
     v

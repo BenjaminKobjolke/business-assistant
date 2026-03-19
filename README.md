@@ -121,8 +121,10 @@ Key environment variables:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENAI_API_KEY` | (required) | OpenAI API key |
+| `OPENAI_API_KEY` | (required*) | OpenAI API key (*not required when using only Ollama) |
 | `OPENAI_MODEL` | `gpt-4o` | Main model for processing requests |
+| `OPENAI_API_BASE_URL` | (empty) | Custom OpenAI-compatible API endpoint |
+| `OLLAMA_BASE_URL` | (empty) | Ollama API base URL (e.g. `http://localhost:11434/v1`) |
 | `ROUTER_MODEL` | `gpt-5-mini` | Lightweight model for category routing |
 | `PLUGINS` | (empty) | Comma-separated plugin module names |
 | `XMPP_JID` | (required) | Bot's XMPP JID |
@@ -132,6 +134,16 @@ Key environment variables:
 | `USER_TIMEZONE` | `Europe/Berlin` | IANA timezone for time display |
 
 See `.env.example` for the complete list.
+
+### LLM Providers
+
+The bot supports three provider options for both the main agent and router:
+
+- **OpenAI** (default) — set `OPENAI_API_KEY`
+- **OpenAI-compatible APIs** (e.g. DeepSeek) — set `OPENAI_API_BASE_URL` / `ROUTER_API_BASE_URL`
+- **Ollama** (local models) — set `OLLAMA_BASE_URL` (e.g. `http://localhost:11434/v1`), no API key needed
+
+See [docs/LLM_MODELS_configuration.md](docs/LLM_MODELS_configuration.md) for detailed configuration examples and provider priority.
 
 ## Development
 

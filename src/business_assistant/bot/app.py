@@ -101,16 +101,29 @@ class Application:
         registry = PluginRegistry(plugin_data=plugin_data)
         load_plugins(registry, settings.plugin_names)
 
+        main_provider_name = "openai"
         if settings.openai.api_base_url:
             from pydantic_ai.models.openai import OpenAIChatModel
             from pydantic_ai.providers.openai import OpenAIProvider
 
+            main_provider_name = "custom"
             main_provider = OpenAIProvider(
                 base_url=settings.openai.api_base_url,
                 api_key=settings.openai.api_key,
             )
             model: Any = OpenAIChatModel(
                 settings.openai.model, provider=main_provider,
+            )
+        elif settings.openai.ollama_base_url:
+            from pydantic_ai.models.openai import OpenAIChatModel
+            from pydantic_ai.providers.ollama import OllamaProvider
+
+            main_provider_name = "ollama"
+            ollama_provider = OllamaProvider(
+                base_url=settings.openai.ollama_base_url,
+            )
+            model = OpenAIChatModel(
+                settings.openai.model, provider=ollama_provider,
             )
         else:
             model = f"openai:{settings.openai.model}"
@@ -120,16 +133,29 @@ class Application:
             timezone=settings.timezone, core_only=True,
         )
 
+        router_provider_name = "openai"
         if settings.openai.router_api_base_url:
             from pydantic_ai.models.openai import OpenAIChatModel
             from pydantic_ai.providers.openai import OpenAIProvider
 
+            router_provider_name = "custom"
             router_provider = OpenAIProvider(
                 base_url=settings.openai.router_api_base_url,
                 api_key=settings.openai.router_api_key or settings.openai.api_key,
             )
             router_model: Any = OpenAIChatModel(
                 settings.openai.router_model, provider=router_provider,
+            )
+        elif settings.openai.ollama_base_url:
+            from pydantic_ai.models.openai import OpenAIChatModel
+            from pydantic_ai.providers.ollama import OllamaProvider
+
+            router_provider_name = "ollama"
+            ollama_router_provider = OllamaProvider(
+                base_url=settings.openai.ollama_base_url,
+            )
+            router_model = OpenAIChatModel(
+                settings.openai.router_model, provider=ollama_router_provider,
             )
         else:
             router_model = f"openai:{settings.openai.router_model}"
@@ -163,6 +189,8 @@ class Application:
             plugin_data=plugin_data,
             usage_tracker=usage_tracker,
             model_name=settings.openai.model,
+            provider=main_provider_name,
+            router_provider=router_provider_name,
             file_downloader=downloader,
             registry=registry,
             router=router,
