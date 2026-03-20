@@ -27,6 +27,7 @@ from business_assistant.config.constants import (
     CMD_CLEAR,
     CMD_RESTART,
     ERR_AGENT_FAILED,
+    ERR_ROUTER_FAILED,
     LOG_AGENT_ERROR,
     LOG_RESPONSE_DURATION,
     LOG_STICKY_CATEGORIES,
@@ -50,6 +51,10 @@ from business_assistant.plugins.registry import PluginRegistry
 from business_assistant.usage.tracker import UsageTracker
 
 logger = logging.getLogger(__name__)
+
+
+class RouterFailedError(Exception):
+    """Raised when the category router fails to classify a message."""
 
 
 class AIMessageHandler:
@@ -173,6 +178,14 @@ class AIMessageHandler:
             response = BotResponse(text=output)
             response = self._apply_response_processors(response, message.user_id)
             return response
+        except RouterFailedError:
+            ts_out = datetime.now(tz=UTC)
+            self._log_chat(
+                message.user_id, agent_text, ERR_ROUTER_FAILED, error=True,
+                ts_in=ts_in, ts_out=ts_out,
+                duration_s=(ts_out - ts_in).total_seconds(),
+            )
+            return BotResponse(text=ERR_ROUTER_FAILED)
         except Exception:
             logger.error(LOG_AGENT_ERROR, exc_info=True)
             ts_out = datetime.now(tz=UTC)
@@ -181,6 +194,11 @@ class AIMessageHandler:
                 ts_in=ts_in, ts_out=ts_out,
                 duration_s=(ts_out - ts_in).total_seconds(),
             )
+            if self._usage_tracker:
+                self._usage_tracker.log(
+                    RunUsage(requests=1), [], message.user_id,
+                    self._model_name, provider=self._provider,
+                )
             return BotResponse(text=ERR_AGENT_FAILED)
 
     def _apply_message_modifiers(self, text: str, user_id: str) -> str:
@@ -312,6 +330,9 @@ class AIMessageHandler:
                 user_id, self._router.model_name,
                 provider=self._router_provider,
             )
+
+        if routing_result.failed:
+            raise RouterFailedError
 
         # Merge with previously-used categories for this user (sticky)
         merged = routing_result.categories | self._last_categories.get(user_id, set())
