@@ -303,7 +303,7 @@ def create_agent(
         retries=retries,
     )
 
-    @agent.system_prompt
+    @agent.system_prompt(dynamic=True)
     def _time_prompt() -> str:
         return build_time_prompt(timezone)
 

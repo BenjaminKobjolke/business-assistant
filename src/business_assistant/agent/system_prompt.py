@@ -42,5 +42,5 @@ def build_time_prompt(timezone: str) -> str:
     now = utc_now.astimezone(tz)
     local_str = now.strftime("%Y-%m-%d %H:%M:%S %Z")
     utc_str = utc_now.strftime("%Y-%m-%d %H:%M:%S UTC")
-    logger.debug("Time prompt: local=%s (%s), utc=%s", local_str, timezone, utc_str)
+    logger.info("Time prompt: local=%s (%s), utc=%s", local_str, timezone, utc_str)
     return f"Current local date and time: {local_str} ({timezone})"
