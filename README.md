@@ -72,6 +72,8 @@ See [docs/plugins/plugin-development-guide.md](docs/plugins/plugin-development-g
 | Project Management | `business_assistant_pm` | Project orchestration (links email/tasks/notes/files) |
 | Filesystem | `business_assistant_filesystem` | File operations (read, write, copy, move) |
 | Workingtimes | `business_assistant_workingtimes` | Time tracking (log hours, manage entries) |
+| Contacts | `business_assistant_contacts` | Contact management (search, create, update) |
+| Web | `business_assistant_web` | Web operations (download URLs) |
 | Transcribe | `business_assistant_transcribe` | Audio transcription via Whisper |
 | TTS | `business_assistant_tts` | Text-to-speech (uses hooks, no AI tools) |
 
@@ -126,6 +128,9 @@ Key environment variables:
 | `OPENAI_API_BASE_URL` | (empty) | Custom OpenAI-compatible API endpoint |
 | `OLLAMA_BASE_URL` | (empty) | Ollama API base URL (e.g. `http://localhost:11434/v1`) |
 | `ROUTER_MODEL` | `gpt-5-mini` | Lightweight model for category routing |
+| `ROUTER_API_KEY` | (empty) | Separate API key for router (falls back to `OPENAI_API_KEY`) |
+| `ROUTER_API_BASE_URL` | (empty) | Custom endpoint for router (e.g. DeepSeek) |
+| `MAX_RETRIES` | `3` | Max output validation retries for PydanticAI agents |
 | `PLUGINS` | (empty) | Comma-separated plugin module names |
 | `XMPP_JID` | (required) | Bot's XMPP JID |
 | `XMPP_PASSWORD` | (required) | Bot's XMPP password |
