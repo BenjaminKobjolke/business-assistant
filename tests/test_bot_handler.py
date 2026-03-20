@@ -599,3 +599,83 @@ class TestContextLimitWarning:
         assert response.text == "OK"
 
 
+class TestRouterFailureUsageTracking:
+    def test_router_failure_returns_error_and_logs_usage(
+        self, tmp_memory_file: str, tmp_path: Path,
+    ) -> None:
+        """When the router fails, user gets error message and usage is logged."""
+        mock_agent = MagicMock()
+
+        mock_router = MagicMock(spec=CategoryRouter)
+        mock_router.route.return_value = RoutingResult(
+            categories=set(), usage=RunUsage(requests=1), failed=True,
+        )
+        mock_router.model_name = "qwen2.5:1.5b"
+
+        mock_registry = MagicMock(spec=PluginRegistry)
+
+        mock_tracker = MagicMock()
+
+        memory = MemoryStore(tmp_memory_file)
+        log_dir = str(tmp_path / "chats")
+        settings = make_test_settings(chat_log_dir=log_dir)
+
+        handler = AIMessageHandler(
+            agent=mock_agent,
+            memory=memory,
+            settings=settings,
+            registry=mock_registry,
+            router=mock_router,
+            core_tools=[],
+            usage_tracker=mock_tracker,
+            model_name="deepseek-chat",
+            provider="custom",
+            router_provider="ollama",
+        )
+
+        response = handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
+
+        # User should get the router error message
+        assert "router model failed" in response.text.lower()
+        # Agent should NOT have been called
+        mock_agent.run_sync.assert_not_called()
+        # Router usage should still be logged
+        mock_tracker.log.assert_called_once()
+        router_call = mock_tracker.log.call_args
+        assert router_call.args[3] == "qwen2.5:1.5b"
+        assert router_call.kwargs["provider"] == "ollama"
+        assert router_call.args[0].requests == 1
+
+
+class TestFailedRequestUsageTracking:
+    def test_agent_failure_logs_usage(self, tmp_memory_file: str) -> None:
+        """When the agent fails, the failed attempt should still be logged."""
+        mock_agent = MagicMock()
+        mock_agent.run_sync.side_effect = RuntimeError("API timeout")
+
+        mock_tracker = MagicMock()
+        memory = MemoryStore(tmp_memory_file)
+        settings = make_test_settings()
+
+        handler = AIMessageHandler(
+            agent=mock_agent,
+            memory=memory,
+            settings=settings,
+            usage_tracker=mock_tracker,
+            model_name="deepseek-chat",
+            provider="custom",
+        )
+
+        response = handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
+        assert response.text == ERR_AGENT_FAILED
+
+        mock_tracker.log.assert_called_once()
+        call_args = mock_tracker.log.call_args
+        usage = call_args.args[0]
+        assert usage.requests == 1
+        assert usage.input_tokens == 0
+        assert call_args.args[2] == "user@test.com"
+        assert call_args.args[3] == "deepseek-chat"
+        assert call_args.kwargs["provider"] == "custom"
+
+

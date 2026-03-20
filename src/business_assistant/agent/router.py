@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -28,6 +29,7 @@ class RoutingResult:
 
     categories: set[str]
     usage: RunUsage | None
+    failed: bool = False
 
 
 class CategoryRouter:
@@ -36,17 +38,26 @@ class CategoryRouter:
     def __init__(
         self, registry: PluginRegistry, model: Any,
         model_name: str = "", retries: int = 1,
+        provider: str = "",
     ) -> None:
         self._registry = registry
         self._model_name = model_name or (model if isinstance(model, str) else str(model))
         self._all_categories = registry.all_categories()
         self._system_prompt = self._build_prompt()
-        self._agent: Agent[None, CategorySelection] = Agent(
-            model,
-            system_prompt=self._system_prompt,
-            output_type=CategorySelection,
-            retries=retries,
-        )
+        self._text_mode = provider == "ollama"
+        if self._text_mode:
+            self._agent: Agent = Agent(
+                model,
+                system_prompt=self._system_prompt,
+                output_type=str,
+            )
+        else:
+            self._agent = Agent(
+                model,
+                system_prompt=self._system_prompt,
+                output_type=CategorySelection,
+                retries=retries,
+            )
 
     @property
     def model_name(self) -> str:
@@ -62,7 +73,10 @@ class CategoryRouter:
         """
         try:
             result = self._agent.run_sync(text)
-            raw_categories = set(result.output.categories)
+            if self._text_mode:
+                raw_categories = set(self._parse_categories(result.output))
+            else:
+                raw_categories = set(result.output.categories)
 
             # Filter to only registered categories
             valid = raw_categories & self._all_categories
@@ -75,10 +89,43 @@ class CategoryRouter:
             )
             return RoutingResult(categories=valid, usage=result.usage())
         except Exception:
-            logger.warning("Router failed, falling back to all categories", exc_info=True)
+            logger.warning("Router failed", exc_info=True)
             return RoutingResult(
-                categories=set(self._all_categories), usage=None,
+                categories=set(),
+                usage=RunUsage(requests=1),
+                failed=True,
             )
+
+    @staticmethod
+    def _parse_categories(text: str) -> list[str]:
+        """Parse category list from model text response.
+
+        Handles JSON arrays like '["email", "calendar"]' and also
+        extracts arrays embedded in markdown or extra text.
+        """
+        text = text.strip()
+        # Strip markdown code fences if present
+        if text.startswith("```"):
+            text = text.strip("`").strip()
+            if text.startswith("json"):
+                text = text[4:].strip()
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return [str(item) for item in parsed]
+        except (json.JSONDecodeError, ValueError):
+            pass
+        # Fallback: try to find a JSON array in the text
+        start = text.find("[")
+        end = text.rfind("]")
+        if start != -1 and end > start:
+            try:
+                parsed = json.loads(text[start:end + 1])
+                if isinstance(parsed, list):
+                    return [str(item) for item in parsed]
+            except (json.JSONDecodeError, ValueError):
+                pass
+        return []
 
     def _expand_dependencies(self, categories: set[str]) -> set[str]:
         """Expand categories with their required_categories dependencies."""

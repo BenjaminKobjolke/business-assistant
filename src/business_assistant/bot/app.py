@@ -22,6 +22,8 @@ from business_assistant.config.constants import (
     ENV_RTM_TOKEN,
     LOG_APP_STARTING,
     LOG_APP_STOPPED,
+    LOG_OLLAMA_HEALTH_FAILED,
+    LOG_OLLAMA_HEALTH_OK,
     LOG_STARTUP_GREETING_SENT,
     PLUGIN_DATA_COMMAND_HANDLERS,
     PLUGIN_DATA_FTP_SERVICE,
@@ -118,6 +120,15 @@ class Application:
             from pydantic_ai.models.openai import OpenAIChatModel
             from pydantic_ai.providers.ollama import OllamaProvider
 
+            from .health import check_ollama_health
+
+            if check_ollama_health(settings.openai.ollama_base_url):
+                logger.info(LOG_OLLAMA_HEALTH_OK, settings.openai.ollama_base_url)
+            else:
+                msg = LOG_OLLAMA_HEALTH_FAILED % settings.openai.ollama_base_url
+                logger.error(msg)
+                raise RuntimeError(msg)
+
             main_provider_name = "ollama"
             ollama_provider = OllamaProvider(
                 base_url=settings.openai.ollama_base_url,
@@ -163,7 +174,7 @@ class Application:
 
         router = CategoryRouter(
             registry, model=router_model, model_name=settings.openai.router_model,
-            retries=settings.max_retries,
+            retries=settings.max_retries, provider=router_provider_name,
         )
         core_tools = get_core_tools()
 

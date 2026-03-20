@@ -64,7 +64,9 @@ class TestRoutingResult:
         assert result.usage is None
 
 
-class TestCategoryRouter:
+class TestCategoryRouterStructured:
+    """Tests for structured output mode (non-Ollama providers)."""
+
     @patch("business_assistant.agent.router.Agent")
     def test_route_selects_valid_categories(self, mock_agent_cls) -> None:
         registry = _make_registry()
@@ -111,17 +113,6 @@ class TestCategoryRouter:
         assert "todo" in result.categories
 
     @patch("business_assistant.agent.router.Agent")
-    def test_route_fallback_on_exception(self, mock_agent_cls) -> None:
-        registry = _make_registry()
-        mock_agent_cls.return_value.run_sync.side_effect = RuntimeError("API error")
-
-        router = CategoryRouter(registry, model="openai:gpt-5-mini", model_name="gpt-5-mini")
-        result = router.route("anything")
-
-        assert result.categories == registry.all_categories()
-        assert result.usage is None
-
-    @patch("business_assistant.agent.router.Agent")
     def test_route_empty_selection(self, mock_agent_cls) -> None:
         registry = _make_registry()
         mock_result = MagicMock()
@@ -134,14 +125,6 @@ class TestCategoryRouter:
 
         assert result.categories == set()
 
-    def test_model_name_property(self) -> None:
-        registry = _make_registry()
-        with patch("business_assistant.agent.router.Agent"):
-            router = CategoryRouter(
-                registry, model="openai:gpt-5-mini", model_name="gpt-5-mini",
-            )
-        assert router.model_name == "gpt-5-mini"
-
     @patch("business_assistant.agent.router.Agent")
     def test_retries_passed_to_agent(self, mock_agent_cls) -> None:
         registry = _make_registry()
@@ -150,6 +133,94 @@ class TestCategoryRouter:
         )
         call_kwargs = mock_agent_cls.call_args[1]
         assert call_kwargs["retries"] == 5
+
+
+class TestCategoryRouterTextMode:
+    """Tests for text parsing mode (Ollama provider)."""
+
+    @patch("business_assistant.agent.router.Agent")
+    def test_route_parses_json_array(self, mock_agent_cls) -> None:
+        registry = _make_registry()
+        mock_result = MagicMock()
+        mock_result.output = '["email", "calendar"]'
+        mock_result.usage.return_value = RunUsage()
+        mock_agent_cls.return_value.run_sync.return_value = mock_result
+
+        router = CategoryRouter(
+            registry, model="ollama:qwen", model_name="qwen",
+            provider="ollama",
+        )
+        result = router.route("check my emails")
+
+        assert result.categories == {"email", "calendar"}
+
+    @patch("business_assistant.agent.router.Agent")
+    def test_route_parses_embedded_array(self, mock_agent_cls) -> None:
+        registry = _make_registry()
+        mock_result = MagicMock()
+        mock_result.output = 'The categories are: ["email"]'
+        mock_result.usage.return_value = RunUsage()
+        mock_agent_cls.return_value.run_sync.return_value = mock_result
+
+        router = CategoryRouter(
+            registry, model="ollama:qwen", model_name="qwen",
+            provider="ollama",
+        )
+        result = router.route("check emails")
+
+        assert result.categories == {"email"}
+
+    @patch("business_assistant.agent.router.Agent")
+    def test_route_parses_empty_array(self, mock_agent_cls) -> None:
+        registry = _make_registry()
+        mock_result = MagicMock()
+        mock_result.output = "[]"
+        mock_result.usage.return_value = RunUsage()
+        mock_agent_cls.return_value.run_sync.return_value = mock_result
+
+        router = CategoryRouter(
+            registry, model="ollama:qwen", model_name="qwen",
+            provider="ollama",
+        )
+        result = router.route("hello")
+
+        assert result.categories == set()
+
+    @patch("business_assistant.agent.router.Agent")
+    def test_no_retries_in_text_mode(self, mock_agent_cls) -> None:
+        registry = _make_registry()
+        CategoryRouter(
+            registry, model="ollama:qwen", model_name="qwen",
+            retries=5, provider="ollama",
+        )
+        call_kwargs = mock_agent_cls.call_args[1]
+        assert "retries" not in call_kwargs
+
+
+class TestCategoryRouterCommon:
+    """Tests shared across both modes."""
+
+    @patch("business_assistant.agent.router.Agent")
+    def test_route_fallback_on_exception(self, mock_agent_cls) -> None:
+        registry = _make_registry()
+        mock_agent_cls.return_value.run_sync.side_effect = RuntimeError("API error")
+
+        router = CategoryRouter(registry, model="openai:gpt-5-mini", model_name="gpt-5-mini")
+        result = router.route("anything")
+
+        assert result.categories == set()
+        assert result.failed is True
+        assert result.usage is not None
+        assert result.usage.requests == 1
+        assert result.usage.input_tokens == 0
+
+    def test_model_name_property(self) -> None:
+        registry = _make_registry()
+        with patch("business_assistant.agent.router.Agent"):
+            router = CategoryRouter(
+                registry, model="openai:gpt-5-mini", model_name="gpt-5-mini",
+            )
+        assert router.model_name == "gpt-5-mini"
 
     def test_model_name_from_object_model(self) -> None:
         registry = _make_registry()
@@ -171,3 +242,22 @@ class TestCategoryRouter:
         assert "calendar" in prompt
         assert "project_management" in prompt
         assert "todo" in prompt
+
+
+class TestParseCategories:
+    def test_plain_json_array(self) -> None:
+        assert CategoryRouter._parse_categories('["email"]') == ["email"]
+
+    def test_markdown_fenced(self) -> None:
+        text = '```json\n["email", "calendar"]\n```'
+        assert CategoryRouter._parse_categories(text) == ["email", "calendar"]
+
+    def test_embedded_in_text(self) -> None:
+        text = 'Based on the message: ["todo", "email"]'
+        assert CategoryRouter._parse_categories(text) == ["todo", "email"]
+
+    def test_invalid_json(self) -> None:
+        assert CategoryRouter._parse_categories("not json at all") == []
+
+    def test_empty_array(self) -> None:
+        assert CategoryRouter._parse_categories("[]") == []

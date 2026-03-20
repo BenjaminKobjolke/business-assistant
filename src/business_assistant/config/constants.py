@@ -48,6 +48,10 @@ BOT_TYPE_XMPP = "xmpp"
 
 # Error messages
 ERR_AGENT_FAILED = "Sorry, I encountered an error processing your message. Please try again."
+ERR_ROUTER_FAILED = (
+    "The router model failed to classify your message. "
+    "Please check the Ollama setup."
+)
 ERR_PLUGIN_LOAD_FAILED = "Failed to load plugin: {name}"
 
 # Chat commands (matched case-insensitive)
@@ -170,6 +174,8 @@ LOG_APP_RESTARTING = "Restart requested via restart.flag — restarting..."
 LOG_APP_SHUTDOWN_FLAG = "Shutdown requested via shutdown.flag — stopping..."
 LOG_STALE_RESTART_FLAG = "Stale restart.flag found (created before app start) — ignoring"
 LOG_STALE_SHUTDOWN_FLAG = "Stale shutdown.flag found (created before app start) — ignoring"
+LOG_OLLAMA_HEALTH_OK = "Ollama health check passed: %s"
+LOG_OLLAMA_HEALTH_FAILED = "Ollama health check FAILED — is Ollama running? URL: %s"
 LOG_AGENT_ERROR = "Error running AI agent"
 LOG_RESPONSE_DURATION = "Response for %s: %.2fs total (router=%.2fs, agent=%.2fs)"
 LOG_FILE_DOWNLOADED = "Downloaded file: %s (%d bytes)"
@@ -210,11 +216,16 @@ Current memory contents:
 # Router system prompt (for category selection)
 ROUTER_SYSTEM_PROMPT = """\
 You are a message router. Given the user's message, select which tool categories \
-are needed to handle it. Return ONLY the category names as a list.
+are needed to handle it. Return ONLY a JSON array of category names.
 
 Available categories:
 {category_list}
 
+Examples:
+- "check my emails" -> ["email"]
+- "schedule a meeting about the project" -> ["calendar", "project_management"]
+- "hello" -> []
+
 If the message is general conversation (greetings, questions about yourself), \
-return an empty list.
+return an empty list [].
 If unsure which categories are needed, include all potentially relevant ones."""
