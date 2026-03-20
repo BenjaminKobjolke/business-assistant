@@ -142,6 +142,15 @@ class TestCategoryRouter:
             )
         assert router.model_name == "gpt-5-mini"
 
+    @patch("business_assistant.agent.router.Agent")
+    def test_retries_passed_to_agent(self, mock_agent_cls) -> None:
+        registry = _make_registry()
+        CategoryRouter(
+            registry, model="openai:gpt-5-mini", model_name="gpt-5-mini", retries=5,
+        )
+        call_kwargs = mock_agent_cls.call_args[1]
+        assert call_kwargs["retries"] == 5
+
     def test_model_name_from_object_model(self) -> None:
         registry = _make_registry()
         mock_model = MagicMock()

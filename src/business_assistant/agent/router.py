@@ -33,7 +33,10 @@ class RoutingResult:
 class CategoryRouter:
     """Uses a lightweight AI model to select which plugin categories are needed."""
 
-    def __init__(self, registry: PluginRegistry, model: Any, model_name: str = "") -> None:
+    def __init__(
+        self, registry: PluginRegistry, model: Any,
+        model_name: str = "", retries: int = 1,
+    ) -> None:
         self._registry = registry
         self._model_name = model_name or (model if isinstance(model, str) else str(model))
         self._all_categories = registry.all_categories()
@@ -42,6 +45,7 @@ class CategoryRouter:
             model,
             system_prompt=self._system_prompt,
             output_type=CategorySelection,
+            retries=retries,
         )
 
     @property

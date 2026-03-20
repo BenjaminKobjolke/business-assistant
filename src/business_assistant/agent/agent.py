@@ -270,6 +270,7 @@ def create_agent(
     model: Any,
     timezone: str = "Europe/Berlin",
     core_only: bool = False,
+    retries: int = 1,
 ) -> Agent[Deps, str]:
     """Create and configure the PydanticAI agent.
 
@@ -299,6 +300,7 @@ def create_agent(
         tools=all_tools,
         output_type=str,
         deps_type=Deps,
+        retries=retries,
     )
 
     @agent.system_prompt

@@ -13,6 +13,7 @@ from .constants import (
     DEFAULT_CONTEXT_LIMIT_THRESHOLD,
     DEFAULT_FTP_PORT,
     DEFAULT_MAX_CONVERSATION_HISTORY,
+    DEFAULT_MAX_RETRIES,
     DEFAULT_MEMORY_FILE,
     DEFAULT_OPENAI_MODEL,
     DEFAULT_ROUTER_MODEL,
@@ -31,6 +32,7 @@ from .constants import (
     ENV_FTP_USE_TLS,
     ENV_FTP_USERNAME,
     ENV_MAX_CONVERSATION_HISTORY,
+    ENV_MAX_RETRIES,
     ENV_MEMORY_FILE,
     ENV_OLLAMA_BASE_URL,
     ENV_OPENAI_API_BASE_URL,
@@ -103,6 +105,7 @@ class AppSettings:
     upload_dir: str = DEFAULT_UPLOAD_DIR
     max_conversation_history: int = DEFAULT_MAX_CONVERSATION_HISTORY
     context_limit_threshold: int = DEFAULT_CONTEXT_LIMIT_THRESHOLD
+    max_retries: int = DEFAULT_MAX_RETRIES
     startup_greeting_enabled: bool = False
     startup_greeting_message: str = DEFAULT_STARTUP_GREETING_MESSAGE
     ftp: FtpSettings | None = None
@@ -172,6 +175,12 @@ def load_settings() -> AppSettings:
             os.environ.get(
                 ENV_CONTEXT_LIMIT_THRESHOLD,
                 str(DEFAULT_CONTEXT_LIMIT_THRESHOLD),
+            )
+        ),
+        max_retries=int(
+            os.environ.get(
+                ENV_MAX_RETRIES,
+                str(DEFAULT_MAX_RETRIES),
             )
         ),
         startup_greeting_enabled=os.environ.get(

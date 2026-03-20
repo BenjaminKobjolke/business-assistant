@@ -48,6 +48,13 @@ class TestSettings:
         assert settings.usage_log_dir == "logs/app/usage"
         assert settings.plugin_names == []
         assert settings.max_conversation_history == 100
+        assert settings.max_retries == 3
+
+    def test_max_retries_from_env(self, monkeypatch) -> None:
+        monkeypatch.setenv("MAX_RETRIES", "5")
+        with patch("business_assistant.config.settings.load_dotenv"):
+            settings = load_settings()
+        assert settings.max_retries == 5
 
     def test_empty_plugins_string(self, monkeypatch) -> None:
         monkeypatch.setenv("PLUGINS", "")

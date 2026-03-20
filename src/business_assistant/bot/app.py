@@ -131,6 +131,7 @@ class Application:
         agent = create_agent(
             registry, memory, model,
             timezone=settings.timezone, core_only=True,
+            retries=settings.max_retries,
         )
 
         router_provider_name = "openai"
@@ -162,6 +163,7 @@ class Application:
 
         router = CategoryRouter(
             registry, model=router_model, model_name=settings.openai.router_model,
+            retries=settings.max_retries,
         )
         core_tools = get_core_tools()
 

@@ -69,6 +69,12 @@ class TestAgentCreation:
         assert "list_pending_retries" in tool_names
         assert "complete_retry" in tool_names
 
+    def test_create_agent_passes_retries(self, tmp_memory_file: str) -> None:
+        memory = MemoryStore(tmp_memory_file)
+        registry = PluginRegistry()
+        agent = create_agent(registry, memory, TestModel(), retries=5)
+        assert agent._max_result_retries == 5
+
 
 class TestBuildTimePrompt:
     def test_returns_correct_format(self) -> None:
