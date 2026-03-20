@@ -38,7 +38,8 @@ class TestStartupGreetingSettings:
 
     def test_greeting_disabled_explicit(self, monkeypatch) -> None:
         monkeypatch.setenv("STARTUP_GREETING_ENABLED", "false")
-        settings = load_settings()
+        with patch("business_assistant.config.settings.load_dotenv"):
+            settings = load_settings()
         assert settings.startup_greeting_enabled is False
 
     def test_custom_greeting_message(self, monkeypatch) -> None:
