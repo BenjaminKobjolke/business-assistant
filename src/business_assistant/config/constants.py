@@ -223,6 +223,7 @@ Available categories:
 
 Examples:
 - "check my emails" -> ["email"]
+- "start workflow inbox zero" -> ["project_management"]
 - "schedule a meeting about the project" -> ["calendar", "project_management"]
 - "hello" -> []
 
