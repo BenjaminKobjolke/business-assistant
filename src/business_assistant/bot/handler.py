@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from bot_commander.types import BotMessage, BotResponse
-from pydantic_ai import Agent
 from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
@@ -22,14 +21,16 @@ from pydantic_ai.messages import (
 from pydantic_ai.usage import RunUsage
 
 from business_assistant.agent.deps import Deps
-from business_assistant.agent.router import CategoryRouter
+from business_assistant.bot.handler_deps import ChatLogEntry, HandlerDeps
 from business_assistant.config.constants import (
     CMD_CLEAR,
     CMD_RESTART,
     ERR_AGENT_FAILED,
     ERR_ROUTER_FAILED,
     LOG_AGENT_ERROR,
+    LOG_CHAT_CLEARED,
     LOG_RESPONSE_DURATION,
+    LOG_RESTART_REQUESTED,
     LOG_STICKY_CATEGORIES,
     LOG_TOOLS_SELECTED,
     OPENAI_MAX_TOOLS,
@@ -38,17 +39,14 @@ from business_assistant.config.constants import (
     PLUGIN_DATA_MESSAGE_MODIFIERS,
     PLUGIN_DATA_RESPONSE_PROCESSORS,
     RESP_CHAT_CLEARED,
+    RESP_FILE_PROCESSED,
+    RESP_FILE_RECEIVED,
     RESP_RESTART_TRIGGERED,
     RESTART_FLAG_FILE,
     SYNONYM_PREFIX,
     TRANSCRIPTION_PREFIX,
     WARN_CONTEXT_LIMIT,
 )
-from business_assistant.config.settings import AppSettings
-from business_assistant.files.downloader import FileDownloader
-from business_assistant.memory.store import MemoryStore
-from business_assistant.plugins.registry import PluginRegistry
-from business_assistant.usage.tracker import UsageTracker
 
 logger = logging.getLogger(__name__)
 
@@ -65,35 +63,21 @@ class AIMessageHandler:
     Maintains per-user conversation history for multi-turn context.
     """
 
-    def __init__(
-        self,
-        agent: Agent[Deps, str],
-        memory: MemoryStore,
-        settings: AppSettings,
-        plugin_data: dict | None = None,
-        usage_tracker: UsageTracker | None = None,
-        model_name: str = "",
-        provider: str = "",
-        router_provider: str = "",
-        file_downloader: FileDownloader | None = None,
-        registry: PluginRegistry | None = None,
-        router: CategoryRouter | None = None,
-        core_tools: list | None = None,
-    ) -> None:
-        self._agent = agent
-        self._memory = memory
-        self._settings = settings
-        self._plugin_data = plugin_data or {}
-        self._usage_tracker = usage_tracker
-        self._model_name = model_name
-        self._provider = provider
-        self._router_provider = router_provider
-        self._file_downloader = file_downloader
-        self._registry = registry
-        self._router = router
-        self._core_tools = core_tools or []
+    def __init__(self, deps: HandlerDeps) -> None:
+        self._agent = deps.agent
+        self._memory = deps.memory
+        self._settings = deps.settings
+        self._plugin_data = deps.plugin_data or {}
+        self._usage_tracker = deps.usage_tracker
+        self._model_name = deps.model_name
+        self._provider = deps.provider
+        self._router_provider = deps.router_provider
+        self._file_downloader = deps.file_downloader
+        self._registry = deps.registry
+        self._router = deps.router
+        self._core_tools = deps.core_tools or []
         self._executor = ThreadPoolExecutor(max_workers=2)
-        self._chat_log_dir = Path(settings.chat_log_dir)
+        self._chat_log_dir = Path(self._settings.chat_log_dir)
         self._chat_log_dir.mkdir(parents=True, exist_ok=True)
         self._conversation_starts: dict[str, str] = {}
         self._last_categories: dict[str, set[str]] = {}
@@ -153,13 +137,13 @@ class AIMessageHandler:
             self._histories[message.user_id] = _safe_truncate(
                 new_history, self._settings.max_conversation_history
             )
-            self._log_chat(
-                message.user_id, agent_text, output, error=False,
-                ts_in=ts_in, ts_out=ts_out, duration_s=total_dur,
+            self._log_chat(ChatLogEntry(
+                user=message.user_id, input_text=agent_text, output_text=output,
+                error=False, ts_in=ts_in, ts_out=ts_out, duration_s=total_dur,
                 router_duration_s=router_dur, agent_duration_s=agent_dur,
                 tools_called=tools_called, tool_call_count=tool_call_count,
                 llm_requests=usage.requests,
-            )
+            ))
             if self._usage_tracker:
                 self._usage_tracker.log(
                     usage, new_history, message.user_id, self._model_name,
@@ -180,20 +164,22 @@ class AIMessageHandler:
             return response
         except RouterFailedError:
             ts_out = datetime.now(tz=UTC)
-            self._log_chat(
-                message.user_id, agent_text, ERR_ROUTER_FAILED, error=True,
+            self._log_chat(ChatLogEntry(
+                user=message.user_id, input_text=agent_text,
+                output_text=ERR_ROUTER_FAILED, error=True,
                 ts_in=ts_in, ts_out=ts_out,
                 duration_s=(ts_out - ts_in).total_seconds(),
-            )
+            ))
             return BotResponse(text=ERR_ROUTER_FAILED)
         except Exception:
             logger.error(LOG_AGENT_ERROR, exc_info=True)
             ts_out = datetime.now(tz=UTC)
-            self._log_chat(
-                message.user_id, agent_text, ERR_AGENT_FAILED, error=True,
+            self._log_chat(ChatLogEntry(
+                user=message.user_id, input_text=agent_text,
+                output_text=ERR_AGENT_FAILED, error=True,
                 ts_in=ts_in, ts_out=ts_out,
                 duration_s=(ts_out - ts_in).total_seconds(),
-            )
+            ))
             if self._usage_tracker:
                 self._usage_tracker.log(
                     RunUsage(requests=1), [], message.user_id,
@@ -247,9 +233,12 @@ class AIMessageHandler:
                     att.url, att.filename, att.mime_type
                 )
                 parts.append(
-                    f"[File received: {downloaded.filename} "
-                    f"({downloaded.mime_type or 'unknown'}, {downloaded.size} bytes) "
-                    f"saved to {downloaded.path}]"
+                    RESP_FILE_RECEIVED.format(
+                        filename=downloaded.filename,
+                        mime_type=downloaded.mime_type or "unknown",
+                        size=downloaded.size,
+                        path=downloaded.path,
+                    )
                 )
                 if handler_registry and downloaded.mime_type:
                     for plugin_name, handler_fn in handler_registry.get_handlers(
@@ -258,7 +247,9 @@ class AIMessageHandler:
                         try:
                             result = handler_fn(downloaded, message.user_id)
                             parts.append(
-                                f"[File processed by {plugin_name}: {result.summary}]"
+                                RESP_FILE_PROCESSED.format(
+                                    plugin=plugin_name, summary=result.summary,
+                                )
                             )
                             if result.summary.startswith(TRANSCRIPTION_PREFIX):
                                 transcriptions.append(
@@ -380,11 +371,11 @@ class AIMessageHandler:
             self._conversation_starts.pop(user_id, None)
             self._last_categories.pop(user_id, None)
             self._context_warned.pop(user_id, None)
-            logger.info("Chat history cleared for user %s", user_id)
+            logger.info(LOG_CHAT_CLEARED, user_id)
             return BotResponse(text=RESP_CHAT_CLEARED)
         if normalized in CMD_RESTART:
             Path(RESTART_FLAG_FILE).touch()
-            logger.info("Restart requested by user %s", user_id)
+            logger.info(LOG_RESTART_REQUESTED, user_id)
             return BotResponse(text=RESP_RESTART_TRIGGERED)
 
         for handler in self._plugin_data.get(PLUGIN_DATA_COMMAND_HANDLERS, []):
@@ -415,47 +406,38 @@ class AIMessageHandler:
         log_path.parent.mkdir(parents=True, exist_ok=True)
         return log_path
 
-    def _log_chat(
-        self,
-        user: str,
-        input_text: str,
-        output_text: str,
-        *,
-        error: bool,
-        ts_in: datetime | None = None,
-        ts_out: datetime | None = None,
-        duration_s: float | None = None,
-        router_duration_s: float | None = None,
-        agent_duration_s: float | None = None,
-        tools_called: list[str] | None = None,
-        tool_call_count: int | None = None,
-        llm_requests: int | None = None,
-    ) -> None:
+    def _log_chat(self, entry: ChatLogEntry) -> None:
         """Append a JSON line to the per-conversation chat log file."""
         try:
             now = datetime.now(tz=UTC)
-            entry: dict = {
-                "ts_in": (ts_in or now).isoformat(),
-                "ts_out": (ts_out or now).isoformat(),
-                "duration_s": round(duration_s, 2) if duration_s is not None else None,
+            record: dict = {
+                "ts_in": (entry.ts_in or now).isoformat(),
+                "ts_out": (entry.ts_out or now).isoformat(),
+                "duration_s": (
+                    round(entry.duration_s, 2) if entry.duration_s is not None else None
+                ),
                 "router_duration_s": (
-                    round(router_duration_s, 2) if router_duration_s is not None else None
+                    round(entry.router_duration_s, 2)
+                    if entry.router_duration_s is not None
+                    else None
                 ),
                 "agent_duration_s": (
-                    round(agent_duration_s, 2) if agent_duration_s is not None else None
+                    round(entry.agent_duration_s, 2)
+                    if entry.agent_duration_s is not None
+                    else None
                 ),
-                "tools_called": tools_called,
-                "tool_call_count": tool_call_count,
-                "llm_requests": llm_requests,
-                "user": user,
-                "in": input_text,
-                "out": output_text,
-                "error": error,
+                "tools_called": entry.tools_called,
+                "tool_call_count": entry.tool_call_count,
+                "llm_requests": entry.llm_requests,
+                "user": entry.user,
+                "in": entry.input_text,
+                "out": entry.output_text,
+                "error": entry.error,
             }
-            entry = {k: v for k, v in entry.items() if v is not None}
-            log_path = self._get_chat_log_path(user)
+            record = {k: v for k, v in record.items() if v is not None}
+            log_path = self._get_chat_log_path(entry.user)
             with open(log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
         except Exception:
             logger.warning("Failed to write chat log entry", exc_info=True)
 

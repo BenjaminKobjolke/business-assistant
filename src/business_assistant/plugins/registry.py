@@ -6,12 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from business_assistant.config.constants import (
-    PLUGIN_DATA_COMMAND_HANDLERS,
-    PLUGIN_DATA_FILE_HANDLERS,
-    PLUGIN_DATA_MESSAGE_MODIFIERS,
-    PLUGIN_DATA_RESPONSE_PROCESSORS,
-)
+from business_assistant.plugins.hook_manager import PluginHookManager
 
 
 class PluginCategoryConflictError(Exception):
@@ -46,6 +41,7 @@ class PluginRegistry:
         self._category_tools: dict[str, list[Any]] = {}
         self._category_prompts: dict[str, str] = {}
         self.plugin_data: dict[str, Any] = plugin_data if plugin_data is not None else {}
+        self._hooks = PluginHookManager(self.plugin_data)
 
     def register(self, info: PluginInfo, tools: list[Any]) -> None:
         """Register a plugin with its info and PydanticAI Tool objects."""
@@ -110,46 +106,20 @@ class PluginRegistry:
         plugin_name: str,
         handler: Callable,
     ) -> None:
-        """Register a file type handler. Creates FileHandlerRegistry in plugin_data if needed."""
-        from business_assistant.files.handler_registry import FileHandlerRegistry
-
-        if PLUGIN_DATA_FILE_HANDLERS not in self.plugin_data:
-            self.plugin_data[PLUGIN_DATA_FILE_HANDLERS] = FileHandlerRegistry()
-        self.plugin_data[PLUGIN_DATA_FILE_HANDLERS].register(
-            mime_patterns, plugin_name, handler
-        )
+        """Register a file type handler (delegates to PluginHookManager)."""
+        self._hooks.register_file_handler(mime_patterns, plugin_name, handler)
 
     def register_response_processor(self, processor: Callable) -> None:
-        """Register a response processor that transforms responses before sending.
-
-        Processors are called in registration order with signature:
-        ``(BotResponse, user_id: str, plugin_data: dict) -> BotResponse``
-        """
-        if PLUGIN_DATA_RESPONSE_PROCESSORS not in self.plugin_data:
-            self.plugin_data[PLUGIN_DATA_RESPONSE_PROCESSORS] = []
-        self.plugin_data[PLUGIN_DATA_RESPONSE_PROCESSORS].append(processor)
+        """Register a response processor (delegates to PluginHookManager)."""
+        self._hooks.register_response_processor(processor)
 
     def register_command_handler(self, handler: Callable) -> None:
-        """Register a command handler that intercepts messages before the AI.
-
-        Handlers are called in registration order with signature:
-        ``(text: str, user_id: str, plugin_data: dict) -> BotResponse | None``
-
-        Return a BotResponse to short-circuit (skip AI), or None to continue.
-        """
-        if PLUGIN_DATA_COMMAND_HANDLERS not in self.plugin_data:
-            self.plugin_data[PLUGIN_DATA_COMMAND_HANDLERS] = []
-        self.plugin_data[PLUGIN_DATA_COMMAND_HANDLERS].append(handler)
+        """Register a command handler (delegates to PluginHookManager)."""
+        self._hooks.register_command_handler(handler)
 
     def register_message_modifier(self, modifier: Callable) -> None:
-        """Register a message modifier that transforms text before the AI sees it.
-
-        Modifiers are called in registration order with signature:
-        ``(text: str, user_id: str, plugin_data: dict) -> str``
-        """
-        if PLUGIN_DATA_MESSAGE_MODIFIERS not in self.plugin_data:
-            self.plugin_data[PLUGIN_DATA_MESSAGE_MODIFIERS] = []
-        self.plugin_data[PLUGIN_DATA_MESSAGE_MODIFIERS].append(modifier)
+        """Register a message modifier (delegates to PluginHookManager)."""
+        self._hooks.register_message_modifier(modifier)
 
     def tools_for_categories(self, categories: set[str]) -> list[Any]:
         """Return tools from specified categories + uncategorized plugins."""

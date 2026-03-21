@@ -180,6 +180,49 @@ LOG_AGENT_ERROR = "Error running AI agent"
 LOG_RESPONSE_DURATION = "Response for %s: %.2fs total (router=%.2fs, agent=%.2fs)"
 LOG_FILE_DOWNLOADED = "Downloaded file: %s (%d bytes)"
 LOG_FILE_DOWNLOAD_FAILED = "Failed to download file from %s"
+LOG_CHAT_CLEARED = "Chat history cleared for user %s"
+LOG_RESTART_REQUESTED = "Restart requested by user %s"
+
+# Memory tool responses
+RESP_MEMORY_NOT_FOUND = "No memory found for key '{key}'."
+RESP_MEMORY_GET = "{key}: {value}"
+RESP_MEMORY_SET = "Remembered: {key} = {value}"
+RESP_MEMORY_DELETED = "Forgot: {key}"
+RESP_MEMORY_EMPTY = "Memory is empty."
+RESP_MEMORY_LIST_HEADER = "Stored memories:"
+
+# Feedback tool responses
+RESP_FEEDBACK_SAVED = "Feedback saved: {filename}"
+RESP_RETRY_CREATED = " Pending retry created: {retry_id}"
+RESP_NO_PENDING_RETRIES = "No pending retries found."
+RESP_PENDING_RETRIES_HEADER = "Pending retries ({count}):"
+RESP_RETRY_NOT_FOUND = "Retry not found: {retry_id}"
+RESP_RETRY_READ_ERROR = "Error reading retry file: {retry_id}"
+RESP_RETRY_ALREADY_COMPLETED = "Retry already completed: {retry_id}"
+RESP_RETRY_COMPLETED = "Retry completed: {retry_id}"
+LOG_FEEDBACK_WRITTEN = "Feedback written to %s"
+LOG_RETRY_SAVED = "Pending retry saved: %s"
+LOG_RETRY_COMPLETED = "Retry completed: %s"
+
+# Synonym tool responses
+RESP_SYNONYM_SAVED = "Synonym saved: '{synonym}' \u2192 '{target}'"
+RESP_NO_SYNONYMS = "No synonyms defined."
+RESP_SYNONYMS_HEADER = "Command synonyms:"
+RESP_SYNONYM_DELETED = "Synonym deleted: '{synonym}'"
+RESP_SYNONYM_NOT_FOUND = "No synonym found for '{synonym}'."
+
+# Usage report responses
+RESP_NO_USAGE_DATA = "No usage data found."
+RESP_USAGE_REPORT_FAILED = "Failed to generate usage report."
+
+# File handling responses
+RESP_FILE_RECEIVED = (
+    "[File received: {filename} ({mime_type}, {size} bytes) saved to {path}]"
+)
+RESP_FILE_PROCESSED = "[File processed by {plugin}: {summary}]"
+
+# Health check
+OLLAMA_HEALTH_RESPONSE = "Ollama is running"
 
 # System prompt
 SYSTEM_PROMPT_BASE = """You are a helpful business assistant. You help users manage their work \

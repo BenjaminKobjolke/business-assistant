@@ -20,6 +20,7 @@ from pydantic_ai.usage import RunUsage
 
 from business_assistant.agent.router import CategoryRouter, RoutingResult
 from business_assistant.bot.handler import AIMessageHandler, _safe_truncate
+from business_assistant.bot.handler_deps import HandlerDeps
 from business_assistant.config.constants import (
     ERR_AGENT_FAILED,
     PLUGIN_DATA_COMMAND_HANDLERS,
@@ -58,13 +59,13 @@ def _make_handler(
     memory = MemoryStore(tmp_memory_file or "nonexistent.json")
     settings = make_test_settings(chat_log_file=chat_log_file, chat_log_dir=chat_log_dir)
 
-    return AIMessageHandler(
+    return AIMessageHandler(HandlerDeps(
         agent=mock_agent,
         memory=memory,
         settings=settings,
         file_downloader=file_downloader,
         plugin_data=plugin_data,
-    )
+    ))
 
 
 class TestAIMessageHandler:
@@ -394,14 +395,14 @@ class TestStickyCategories:
         log_dir = str(tmp_path / "chats")
         settings = make_test_settings(chat_log_dir=log_dir)
 
-        return AIMessageHandler(
+        return AIMessageHandler(HandlerDeps(
             agent=mock_agent,
             memory=memory,
             settings=settings,
             registry=mock_registry,
             router=mock_router,
             core_tools=[],
-        )
+        ))
 
     def test_categories_sticky_across_turns(
         self, tmp_memory_file: str, tmp_path: Path,
@@ -551,11 +552,11 @@ class TestContextLimitWarning:
         memory = MemoryStore(tmp_memory_file)
         settings = make_test_settings(context_limit_threshold=threshold)
 
-        return AIMessageHandler(
+        return AIMessageHandler(HandlerDeps(
             agent=mock_agent,
             memory=memory,
             settings=settings,
-        )
+        ))
 
     def test_warning_appended_when_over_limit(self, tmp_memory_file: str) -> None:
         handler = self._make_handler_with_limit(
@@ -620,7 +621,7 @@ class TestRouterFailureUsageTracking:
         log_dir = str(tmp_path / "chats")
         settings = make_test_settings(chat_log_dir=log_dir)
 
-        handler = AIMessageHandler(
+        handler = AIMessageHandler(HandlerDeps(
             agent=mock_agent,
             memory=memory,
             settings=settings,
@@ -631,7 +632,7 @@ class TestRouterFailureUsageTracking:
             model_name="deepseek-chat",
             provider="custom",
             router_provider="ollama",
-        )
+        ))
 
         response = handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
 
@@ -657,14 +658,14 @@ class TestFailedRequestUsageTracking:
         memory = MemoryStore(tmp_memory_file)
         settings = make_test_settings()
 
-        handler = AIMessageHandler(
+        handler = AIMessageHandler(HandlerDeps(
             agent=mock_agent,
             memory=memory,
             settings=settings,
             usage_tracker=mock_tracker,
             model_name="deepseek-chat",
             provider="custom",
-        )
+        ))
 
         response = handler.handle(BotMessage(user_id="user@test.com", text="Hello"))
         assert response.text == ERR_AGENT_FAILED

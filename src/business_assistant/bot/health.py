@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import urllib.request
 
+from business_assistant.config.constants import OLLAMA_HEALTH_RESPONSE
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,7 +24,7 @@ def check_ollama_health(base_url: str, timeout: float = 5.0) -> bool:
         req = urllib.request.Request(root_url, method="GET")
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = resp.read().decode("utf-8", errors="replace")
-            return "Ollama is running" in body
+            return OLLAMA_HEALTH_RESPONSE in body
     except Exception:
         logger.debug("Ollama health check error", exc_info=True)
         return False

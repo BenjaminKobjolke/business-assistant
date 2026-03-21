@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 from datetime import UTC, datetime
@@ -17,6 +18,7 @@ from business_assistant.config.constants import (
     USAGE_LOG_SUFFIX,
     USAGE_SOURCE_BOT,
 )
+from business_assistant.usage.models import UsageEntry
 
 logger = logging.getLogger(__name__)
 
@@ -62,24 +64,24 @@ class UsageTracker:
                 self._tool_plugin_map.get(t, CORE_PLUGIN_NAME) for t in tools_called
             ))
 
-            entry: dict[str, Any] = {
-                "ts": now.isoformat(),
-                "source": source,
-                "user": user,
-                "model": model,
-                "provider": provider,
-                "input_tokens": usage.input_tokens,
-                "output_tokens": usage.output_tokens,
-                "cache_read_tokens": usage.cache_read_tokens,
-                "cache_write_tokens": usage.cache_write_tokens,
-                "requests": usage.requests,
-                "tool_calls_count": usage.tool_calls,
-                "tools_called": tools_called,
-                "plugins_involved": plugins,
-            }
+            entry = UsageEntry(
+                ts=now.isoformat(),
+                source=source,
+                user=user,
+                model=model,
+                provider=provider,
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                cache_read_tokens=usage.cache_read_tokens,
+                cache_write_tokens=usage.cache_write_tokens,
+                requests=usage.requests,
+                tool_calls_count=usage.tool_calls,
+                tools_called=tools_called,
+                plugins_involved=plugins,
+            )
             path = self._resolve_path(now)
             with open(path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                f.write(json.dumps(dataclasses.asdict(entry), ensure_ascii=False) + "\n")
         except Exception:
             logger.warning("Failed to write usage log entry", exc_info=True)
 

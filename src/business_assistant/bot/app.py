@@ -15,6 +15,7 @@ from bot_commander.manager import BotManager
 
 from business_assistant.agent.agent import create_agent, get_core_tools
 from business_assistant.agent.router import CategoryRouter
+from business_assistant.bot.handler_deps import HandlerDeps
 from business_assistant.config.constants import (
     BOT_TYPE_XMPP,
     CORE_PLUGIN_NAME,
@@ -195,7 +196,7 @@ class Application:
         usage_tracker = UsageTracker(settings.usage_log_dir, tool_plugin_map)
         downloader = FileDownloader(settings.upload_dir)
 
-        handler = AIMessageHandler(
+        handler = AIMessageHandler(HandlerDeps(
             agent=agent,
             memory=memory,
             settings=settings,
@@ -208,7 +209,7 @@ class Application:
             registry=registry,
             router=router,
             core_tools=core_tools,
-        )
+        ))
 
         config_provider = SettingsConfigProvider(settings.xmpp)
         self._bot_manager = BotManager(

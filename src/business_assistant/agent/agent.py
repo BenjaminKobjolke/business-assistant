@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import os
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -17,6 +19,28 @@ from business_assistant.config.constants import (
     DEFAULT_FEEDBACK_DIR,
     DEFAULT_PENDING_RETRIES_SUBDIR,
     ENV_FEEDBACK_DIR,
+    LOG_FEEDBACK_WRITTEN,
+    LOG_RETRY_COMPLETED,
+    LOG_RETRY_SAVED,
+    RESP_FEEDBACK_SAVED,
+    RESP_MEMORY_DELETED,
+    RESP_MEMORY_EMPTY,
+    RESP_MEMORY_GET,
+    RESP_MEMORY_LIST_HEADER,
+    RESP_MEMORY_NOT_FOUND,
+    RESP_MEMORY_SET,
+    RESP_NO_PENDING_RETRIES,
+    RESP_NO_SYNONYMS,
+    RESP_PENDING_RETRIES_HEADER,
+    RESP_RETRY_ALREADY_COMPLETED,
+    RESP_RETRY_COMPLETED,
+    RESP_RETRY_CREATED,
+    RESP_RETRY_NOT_FOUND,
+    RESP_RETRY_READ_ERROR,
+    RESP_SYNONYM_DELETED,
+    RESP_SYNONYM_NOT_FOUND,
+    RESP_SYNONYM_SAVED,
+    RESP_SYNONYMS_HEADER,
     RETRY_STATUS_COMPLETED,
     RETRY_STATUS_PENDING,
     SYNONYM_PREFIX,
@@ -36,30 +60,30 @@ def _memory_get(ctx: RunContext[Deps], key: str) -> str:
     """Look up a value from memory by key."""
     value = ctx.deps.memory.get(key)
     if value is None:
-        return f"No memory found for key '{key}'."
-    return f"{key}: {value}"
+        return RESP_MEMORY_NOT_FOUND.format(key=key)
+    return RESP_MEMORY_GET.format(key=key, value=value)
 
 
 def _memory_set(ctx: RunContext[Deps], key: str, value: str) -> str:
     """Store a key-value pair in memory for future reference."""
     ctx.deps.memory.set(key, value)
-    return f"Remembered: {key} = {value}"
+    return RESP_MEMORY_SET.format(key=key, value=value)
 
 
 def _memory_delete(ctx: RunContext[Deps], key: str) -> str:
     """Delete a key from memory."""
     if ctx.deps.memory.delete(key):
-        return f"Forgot: {key}"
-    return f"No memory found for key '{key}'."
+        return RESP_MEMORY_DELETED.format(key=key)
+    return RESP_MEMORY_NOT_FOUND.format(key=key)
 
 
 def _memory_list(ctx: RunContext[Deps]) -> str:
     """List all stored memories."""
     data = ctx.deps.memory.list_all()
     if not data:
-        return "Memory is empty."
+        return RESP_MEMORY_EMPTY
     lines = [f"- {k}: {v}" for k, v in sorted(data.items())]
-    return "Stored memories:\n" + "\n".join(lines)
+    return RESP_MEMORY_LIST_HEADER + "\n" + "\n".join(lines)
 
 
 def _resolve_feedback_dir() -> Path:
@@ -72,6 +96,20 @@ def _resolve_feedback_dir() -> Path:
 
 
 _SAFE_FILENAME_RE = re.compile(r"[^\w\-]")
+
+
+@dataclass
+class RetryData:
+    """Structured pending retry record."""
+
+    id: str
+    created_at: str
+    user_id: str
+    status: str
+    user_request: str
+    intended_action: str
+    feedback_file: str
+    completed_at: str | None = None
 
 
 def _write_feedback(
@@ -93,29 +131,30 @@ def _write_feedback(
 
     filepath = feedback_dir / filename
     filepath.write_text(report, encoding="utf-8")
-    logger.info("Feedback written to %s", filepath)
+    logger.info(LOG_FEEDBACK_WRITTEN, filepath)
 
-    result_msg = f"Feedback saved: {filename}"
+    result_msg = RESP_FEEDBACK_SAVED.format(filename=filename)
 
     if intended_action:
         retry_dir = feedback_dir / DEFAULT_PENDING_RETRIES_SUBDIR
         retry_dir.mkdir(parents=True, exist_ok=True)
 
         retry_id = f"{ts}_{safe_title}"
-        retry_data = {
-            "id": retry_id,
-            "created_at": datetime.now(tz=tz).isoformat(),
-            "user_id": ctx.deps.user_id,
-            "status": RETRY_STATUS_PENDING,
-            "user_request": content,
-            "intended_action": intended_action,
-            "feedback_file": filename,
-            "completed_at": None,
-        }
+        retry_data = RetryData(
+            id=retry_id,
+            created_at=datetime.now(tz=tz).isoformat(),
+            user_id=ctx.deps.user_id,
+            status=RETRY_STATUS_PENDING,
+            user_request=content,
+            intended_action=intended_action,
+            feedback_file=filename,
+        )
         retry_file = retry_dir / f"{retry_id}.json"
-        retry_file.write_text(json.dumps(retry_data, indent=2), encoding="utf-8")
-        logger.info("Pending retry saved: %s", retry_file)
-        result_msg += f" Pending retry created: {retry_id}"
+        retry_file.write_text(
+            json.dumps(dataclasses.asdict(retry_data), indent=2), encoding="utf-8"
+        )
+        logger.info(LOG_RETRY_SAVED, retry_file)
+        result_msg += RESP_RETRY_CREATED.format(retry_id=retry_id)
 
     return result_msg
 
@@ -126,7 +165,7 @@ def _list_pending_retries(ctx: RunContext[Deps]) -> str:
     retry_dir = feedback_dir / DEFAULT_PENDING_RETRIES_SUBDIR
 
     if not retry_dir.is_dir():
-        return "No pending retries found."
+        return RESP_NO_PENDING_RETRIES
 
     pending: list[dict[str, Any]] = []
     for json_file in sorted(retry_dir.glob("*.json")):
@@ -138,7 +177,7 @@ def _list_pending_retries(ctx: RunContext[Deps]) -> str:
             pending.append(data)
 
     if not pending:
-        return "No pending retries found."
+        return RESP_NO_PENDING_RETRIES
 
     lines = []
     for item in pending:
@@ -146,7 +185,7 @@ def _list_pending_retries(ctx: RunContext[Deps]) -> str:
             f"- **{item['id']}**: {item.get('user_request', 'N/A')}\n"
             f"  Action needed: {item.get('intended_action', 'N/A')}"
         )
-    return f"Pending retries ({len(pending)}):\n" + "\n".join(lines)
+    return RESP_PENDING_RETRIES_HEADER.format(count=len(pending)) + "\n" + "\n".join(lines)
 
 
 def _complete_retry(ctx: RunContext[Deps], retry_id: str) -> str:
@@ -156,22 +195,22 @@ def _complete_retry(ctx: RunContext[Deps], retry_id: str) -> str:
     retry_file = retry_dir / f"{retry_id}.json"
 
     if not retry_file.is_file():
-        return f"Retry not found: {retry_id}"
+        return RESP_RETRY_NOT_FOUND.format(retry_id=retry_id)
 
     try:
         data = json.loads(retry_file.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return f"Error reading retry file: {retry_id}"
+        return RESP_RETRY_READ_ERROR.format(retry_id=retry_id)
 
     if data.get("status") == RETRY_STATUS_COMPLETED:
-        return f"Retry already completed: {retry_id}"
+        return RESP_RETRY_ALREADY_COMPLETED.format(retry_id=retry_id)
 
     data["status"] = RETRY_STATUS_COMPLETED
     tz = ZoneInfo(ctx.deps.settings.timezone)
     data["completed_at"] = datetime.now(tz=tz).isoformat()
     retry_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    logger.info("Retry completed: %s", retry_id)
-    return f"Retry completed: {retry_id}"
+    logger.info(LOG_RETRY_COMPLETED, retry_id)
+    return RESP_RETRY_COMPLETED.format(retry_id=retry_id)
 
 
 def _add_synonym(ctx: RunContext[Deps], synonym: str, target: str) -> str:
@@ -179,7 +218,7 @@ def _add_synonym(ctx: RunContext[Deps], synonym: str, target: str) -> str:
     key = f"{SYNONYM_PREFIX}{synonym.lower().strip()}"
     target_clean = target.lower().strip()
     ctx.deps.memory.set(key, target_clean)
-    return f"Synonym saved: '{synonym.strip()}' → '{target_clean}'"
+    return RESP_SYNONYM_SAVED.format(synonym=synonym.strip(), target=target_clean)
 
 
 def _list_synonyms(ctx: RunContext[Deps]) -> str:
@@ -191,17 +230,17 @@ def _list_synonyms(ctx: RunContext[Deps]) -> str:
         if k.startswith(SYNONYM_PREFIX)
     }
     if not synonyms:
-        return "No synonyms defined."
-    lines = [f"- {s} → {t}" for s, t in sorted(synonyms.items())]
-    return "Command synonyms:\n" + "\n".join(lines)
+        return RESP_NO_SYNONYMS
+    lines = [f"- {s} \u2192 {t}" for s, t in sorted(synonyms.items())]
+    return RESP_SYNONYMS_HEADER + "\n" + "\n".join(lines)
 
 
 def _delete_synonym(ctx: RunContext[Deps], synonym: str) -> str:
     """Delete a command synonym."""
     key = f"{SYNONYM_PREFIX}{synonym.lower().strip()}"
     if ctx.deps.memory.delete(key):
-        return f"Synonym deleted: '{synonym.strip()}'"
-    return f"No synonym found for '{synonym.strip()}'."
+        return RESP_SYNONYM_DELETED.format(synonym=synonym.strip())
+    return RESP_SYNONYM_NOT_FOUND.format(synonym=synonym.strip())
 
 
 def get_core_tools() -> list[Tool]:

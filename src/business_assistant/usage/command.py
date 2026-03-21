@@ -9,7 +9,12 @@ from zoneinfo import ZoneInfo
 
 from bot_commander.types import BotResponse
 
-from business_assistant.config.constants import CMD_USAGE, DEFAULT_LEGACY_USAGE_FILE
+from business_assistant.config.constants import (
+    CMD_USAGE,
+    DEFAULT_LEGACY_USAGE_FILE,
+    RESP_NO_USAGE_DATA,
+    RESP_USAGE_REPORT_FAILED,
+)
 from business_assistant.config.settings import AppSettings
 
 from .aggregator import aggregate, get_periods
@@ -36,7 +41,7 @@ def create_usage_handler(settings: AppSettings) -> Callable:
             )
 
             if not entries:
-                return BotResponse(text="No usage data found.")
+                return BotResponse(text=RESP_NO_USAGE_DATA)
 
             now = datetime.now(tz=UTC)
             periods = get_periods(now, tz)
@@ -50,6 +55,6 @@ def create_usage_handler(settings: AppSettings) -> Callable:
             return BotResponse(text=report)
         except Exception:
             logger.error("Usage report generation failed", exc_info=True)
-            return BotResponse(text="Failed to generate usage report.")
+            return BotResponse(text=RESP_USAGE_REPORT_FAILED)
 
     return usage_handler
