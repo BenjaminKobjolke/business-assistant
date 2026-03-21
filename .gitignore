@@ -222,5 +222,9 @@ feedback/
 
 # PID lock file
 bot.pid
+
+# Handoff and shutdown flags
+HANDOFF.md
+shutdown.flag
 /.mcp.json
 /tools/log_analyze/price_cache.db
