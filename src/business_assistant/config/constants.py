@@ -261,6 +261,9 @@ ROUTER_SYSTEM_PROMPT = """\
 You are a message router. Given the user's message, select which tool categories \
 are needed to handle it. Return ONLY a JSON array of category names.
 
+Users may write in any language. Classify messages based on their intent \
+regardless of the language used.
+
 Available categories:
 {category_list}
 
@@ -269,6 +272,12 @@ Examples:
 - "start workflow inbox zero" -> ["project_management"]
 - "schedule a meeting about the project" -> ["calendar", "project_management"]
 - "hello" -> []
+- "schau in meine E-Mails" -> ["email"]
+- "wann arbeitet tamara heute laut kalender" -> ["calendar"]
+- "erstelle eine neue Aufgabe für das Projekt" -> ["todo", "project_management"]
+- "füge einen Termin hinzu und erstelle ein Ticket" -> ["calendar", "project_management"]
+- "was steht auf meiner Todo-Liste" -> ["todo"]
+- "hallo" -> []
 
 If the message is general conversation (greetings, questions about yourself), \
 return an empty list [].
