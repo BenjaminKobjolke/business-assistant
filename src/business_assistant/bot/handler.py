@@ -110,6 +110,12 @@ class AIMessageHandler:
             agent_text = file_prefix + message.text if file_prefix else message.text
             agent_text = self._apply_message_modifiers(agent_text, message.user_id)
 
+            text_is_url_only = message.text.strip().startswith("http")
+            if transcriptions and (not message.text.strip() or text_is_url_only):
+                router_text = transcriptions[0]
+            else:
+                router_text = message.text
+
             deps = Deps(
                 memory=self._memory,
                 settings=self._settings,
@@ -123,6 +129,7 @@ class AIMessageHandler:
                 deps,
                 history,
                 message.user_id,
+                router_text,
             )
             output, new_history, usage, router_dur, agent_dur = future.result(
                 timeout=120,
@@ -272,6 +279,7 @@ class AIMessageHandler:
         deps: Deps,
         message_history: list,
         user_id: str = "",
+        router_text: str = "",
     ) -> tuple[str, list, RunUsage, float, float]:
         """Run the PydanticAI agent synchronously (called from thread pool).
 
@@ -281,7 +289,7 @@ class AIMessageHandler:
         Returns (output, messages, usage, router_duration_s, agent_duration_s).
         """
         t0 = time.monotonic()
-        tools, instructions = self._select_tools(text, user_id)
+        tools, instructions = self._select_tools(router_text or text, user_id)
         router_dur = time.monotonic() - t0
 
         t1 = time.monotonic()

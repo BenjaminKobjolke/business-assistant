@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from bot_commander.types import Attachment, BotMessage, BotResponse
+from pydantic_ai.usage import RunUsage
 
+from business_assistant.agent.router import CategoryRouter, RoutingResult
+from business_assistant.bot.handler import AIMessageHandler
+from business_assistant.bot.handler_deps import HandlerDeps
 from business_assistant.config.constants import (
     PLUGIN_DATA_COMMAND_HANDLERS,
     PLUGIN_DATA_FILE_HANDLERS,
 )
 from business_assistant.files.downloader import DownloadedFile, FileDownloader
 from business_assistant.files.handler_registry import FileHandlerRegistry, FileHandlerResult
+from business_assistant.memory.store import MemoryStore
+from business_assistant.plugins.registry import PluginRegistry
+from tests.conftest import make_test_settings
 from tests.test_bot_handler import _make_handler
 
 
@@ -285,3 +293,134 @@ class TestAttachmentProcessing:
         # Agent should receive just the original text (no prefix)
         agent_text = handler._agent.run_sync.call_args[0][0]
         assert agent_text == "hi"
+
+
+class TestVoiceMessageRouting:
+    """Router should receive clean transcription text, not file metadata."""
+
+    @staticmethod
+    def _make_routed_handler_with_transcription(
+        tmp_memory_file: str,
+        tmp_path: Path,
+        transcription: str,
+    ) -> tuple[AIMessageHandler, MagicMock]:
+        """Create a handler with router, file downloader, and transcription handler."""
+        mock_agent = MagicMock()
+        mock_result = MagicMock()
+        mock_result.output = "OK"
+        mock_result.all_messages.return_value = [{"role": "user"}, {"role": "assistant"}]
+        mock_result.usage.return_value = RunUsage()
+        mock_agent.run_sync.return_value = mock_result
+
+        mock_router = MagicMock(spec=CategoryRouter)
+        mock_router.route.return_value = RoutingResult(
+            categories={"calendar"}, usage=None,
+        )
+
+        mock_registry = MagicMock(spec=PluginRegistry)
+        mock_registry.tools_for_categories.return_value = []
+        mock_registry.prompts_for_categories.return_value = ""
+
+        mock_downloader = MagicMock(spec=FileDownloader)
+        mock_downloader.download.return_value = DownloadedFile(
+            path="data/uploads/voice.m4a",
+            filename="voice.m4a",
+            mime_type="audio/mp4",
+            size=12000,
+        )
+
+        file_registry = FileHandlerRegistry()
+        file_registry.register(
+            ["audio/*"],
+            "transcribe",
+            lambda df, uid: FileHandlerResult(
+                summary=f"Transcription: {transcription}",
+            ),
+        )
+
+        memory = MemoryStore(tmp_memory_file)
+        log_dir = str(tmp_path / "chats")
+        settings = make_test_settings(chat_log_dir=log_dir)
+
+        handler = AIMessageHandler(HandlerDeps(
+            agent=mock_agent,
+            memory=memory,
+            settings=settings,
+            registry=mock_registry,
+            router=mock_router,
+            core_tools=[],
+            file_downloader=mock_downloader,
+            plugin_data={PLUGIN_DATA_FILE_HANDLERS: file_registry},
+        ))
+        return handler, mock_router
+
+    def test_voice_message_router_receives_transcription_text(
+        self, tmp_memory_file: str, tmp_path: Path,
+    ) -> None:
+        """Voice-only message: router should get clean transcription, not metadata."""
+        handler, mock_router = self._make_routed_handler_with_transcription(
+            tmp_memory_file, tmp_path,
+            transcription="welche Termine habe ich heute?",
+        )
+        att = Attachment(
+            url="https://example.com/voice.m4a",
+            filename="voice.m4a",
+            mime_type="audio/mp4",
+        )
+        msg = BotMessage(user_id="user@test.com", text="", attachments=(att,))
+
+        handler.handle(msg)
+
+        router_text = mock_router.route.call_args[0][0]
+        assert router_text == "welche Termine habe ich heute?"
+        assert "[File received:" not in router_text
+        assert "[File processed" not in router_text
+
+    def test_typed_message_with_attachment_router_receives_typed_text(
+        self, tmp_memory_file: str, tmp_path: Path,
+    ) -> None:
+        """Typed message with attachment: router should get typed text, not metadata."""
+        handler, mock_router = self._make_routed_handler_with_transcription(
+            tmp_memory_file, tmp_path,
+            transcription="some audio content",
+        )
+        att = Attachment(
+            url="https://example.com/voice.m4a",
+            filename="voice.m4a",
+            mime_type="audio/mp4",
+        )
+        msg = BotMessage(
+            user_id="user@test.com", text="check my calendar", attachments=(att,),
+        )
+
+        handler.handle(msg)
+
+        router_text = mock_router.route.call_args[0][0]
+        assert router_text == "check my calendar"
+
+    def test_voice_message_with_url_text_router_receives_transcription(
+        self, tmp_memory_file: str, tmp_path: Path,
+    ) -> None:
+        """XMPP voice messages have upload URL as message.text — router should
+        get the transcription, not the URL."""
+        handler, mock_router = self._make_routed_handler_with_transcription(
+            tmp_memory_file, tmp_path,
+            transcription="Do I have unread emails?",
+        )
+        att = Attachment(
+            url="https://xida.me:7443/httpfileupload/abc/voice.m4a",
+            filename="voice.m4a",
+            mime_type="audio/mp4",
+        )
+        msg = BotMessage(
+            user_id="user@test.com",
+            text="https://xida.me:7443/httpfileupload/abc/voice.m4a",
+            attachments=(att,),
+        )
+
+        handler.handle(msg)
+
+        router_text = mock_router.route.call_args[0][0]
+        assert router_text == "Do I have unread emails?"
+        assert "https://" not in router_text
+        assert "[File received:" not in router_text
