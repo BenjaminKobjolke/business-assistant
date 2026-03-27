@@ -261,3 +261,54 @@ class TestParseCategories:
 
     def test_empty_array(self) -> None:
         assert CategoryRouter._parse_categories("[]") == []
+
+
+class TestKeywordHints:
+    """Tests for keyword-based category boosting."""
+
+    @patch("business_assistant.agent.router.Agent")
+    def test_keyword_hints_add_missing_category(self, mock_agent_cls) -> None:
+        """AI returns 'web' but text contains 'email' — keyword hint adds 'email'."""
+        registry = _make_registry()
+        mock_result = MagicMock()
+        mock_result.output = CategorySelection(categories=["web"])
+        mock_result.usage.return_value = RunUsage()
+        mock_agent_cls.return_value.run_sync.return_value = mock_result
+
+        registry.register(
+            PluginInfo(name="web_plugin", description="Web ops", category="web"),
+            [Tool(lambda ctx: "ok", name="web_download")],
+        )
+
+        router = CategoryRouter(registry, model="openai:gpt-5-mini", model_name="gpt-5-mini")
+        result = router.route("Do I have unread emails?")
+
+        assert "email" in result.categories
+
+    @patch("business_assistant.agent.router.Agent")
+    def test_keyword_hints_no_match(self, mock_agent_cls) -> None:
+        """Text without keywords does not add extra categories."""
+        registry = _make_registry()
+        mock_result = MagicMock()
+        mock_result.output = CategorySelection(categories=[])
+        mock_result.usage.return_value = RunUsage()
+        mock_agent_cls.return_value.run_sync.return_value = mock_result
+
+        router = CategoryRouter(registry, model="openai:gpt-5-mini", model_name="gpt-5-mini")
+        result = router.route("hello, how are you?")
+
+        assert result.categories == set()
+
+    @patch("business_assistant.agent.router.Agent")
+    def test_keyword_hints_german_keywords(self, mock_agent_cls) -> None:
+        """German keyword 'Termine' maps to 'calendar'."""
+        registry = _make_registry()
+        mock_result = MagicMock()
+        mock_result.output = CategorySelection(categories=[])
+        mock_result.usage.return_value = RunUsage()
+        mock_agent_cls.return_value.run_sync.return_value = mock_result
+
+        router = CategoryRouter(registry, model="openai:gpt-5-mini", model_name="gpt-5-mini")
+        result = router.route("Welche Termine habe ich heute?")
+
+        assert "calendar" in result.categories

@@ -153,6 +153,31 @@ CATEGORY_EMAIL = "email"
 CATEGORY_CALENDAR = "calendar"
 CATEGORY_PROJECT_MANAGEMENT = "project_management"
 
+# Router keyword hints — supplements the AI router with keyword-based category detection.
+# When the router text contains any of these keywords, the corresponding category is added
+# to the AI-selected categories. This prevents misrouting by small models.
+ROUTER_KEYWORD_HINTS: dict[str, str] = {
+    "email": "email",
+    "emails": "email",
+    "e-mail": "email",
+    "e-mails": "email",
+    "inbox": "email",
+    "unread": "email",
+    "mail": "email",
+    "postfach": "email",
+    "ungelesen": "email",
+    "ungelesene": "email",
+    "ungelesener": "email",
+    "ungelesenes": "email",
+    "kalender": "calendar",
+    "termine": "calendar",
+    "termin": "calendar",
+    "appointment": "calendar",
+    "appointments": "calendar",
+    "calendar": "calendar",
+    "meeting": "calendar",
+}
+
 # Logging defaults
 DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_LOG_DIR = "logs"

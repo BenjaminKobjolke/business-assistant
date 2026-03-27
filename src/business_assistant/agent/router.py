@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,7 +12,7 @@ from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.usage import RunUsage
 
-from business_assistant.config.constants import ROUTER_SYSTEM_PROMPT
+from business_assistant.config.constants import ROUTER_KEYWORD_HINTS, ROUTER_SYSTEM_PROMPT
 from business_assistant.plugins.registry import PluginRegistry
 
 logger = logging.getLogger(__name__)
@@ -80,11 +81,18 @@ class CategoryRouter:
 
             # Filter to only registered categories
             valid = raw_categories & self._all_categories
+            # Boost with keyword-based hints
+            keyword_cats = self._apply_keyword_hints(text)
+            if keyword_cats - valid:
+                logger.info(
+                    "Keyword hints boosted categories: %s", keyword_cats - valid,
+                )
+            valid |= keyword_cats
             # Expand with required_categories dependencies
             valid = self._expand_dependencies(valid)
 
             logger.info(
-                "Router selected categories: %s (raw: %s, tools: keyword)",
+                "Router selected categories: %s (raw: %s)",
                 valid, raw_categories,
             )
             return RoutingResult(categories=valid, usage=result.usage())
@@ -126,6 +134,20 @@ class CategoryRouter:
             except (json.JSONDecodeError, ValueError):
                 pass
         return []
+
+    def _apply_keyword_hints(self, text: str) -> set[str]:
+        """Detect categories from keywords in the input text.
+
+        Supplements the AI router by matching words against
+        ROUTER_KEYWORD_HINTS, filtered to registered categories.
+        """
+        tokens = set(re.findall(r"[a-zA-ZäöüÄÖÜß-]+", text.lower()))
+        hints: set[str] = set()
+        for token in tokens:
+            category = ROUTER_KEYWORD_HINTS.get(token)
+            if category and category in self._all_categories:
+                hints.add(category)
+        return hints
 
     def _expand_dependencies(self, categories: set[str]) -> set[str]:
         """Expand categories with their required_categories dependencies."""
